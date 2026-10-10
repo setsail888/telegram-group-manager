@@ -334,19 +334,18 @@ class GroupBot:
                                   ("🧩 验证", "verify_enabled"))) +
                     "\n\n设置均仅作用于当前群。")
         elif what == "words":
-            words = [r["value"] for r in self.store.filters(chat_id, "word")]
-            exceptions = self.store.filters(chat_id, "word_exception")
-            text = ("⛔ 违禁词与例外\n"
-                    f"总计 {len(words)} 条；定向例外 {len(exceptions)} 条；"
-                    f"拆字识别：{'开' if conf['word_loose_match'] else '关'}\n"
-                    + ("\n".join(words[:30]) if words else "暂无")
-                    + "\n\n群内单条：/addword 词语\n"
-                      "批量导入：/addwords 词1,词2,词3\n"
-                      "误判例外：/wordexcept 词语 | 完整语境\n"
-                      "测试而不删除：/wordtest 要检查的文字")
+            # Keep this message short regardless of rule count. The actual
+            # keyword list is deliberately never rendered in the private panel.
+            words_total = self.store.filter_count(chat_id, "word")
+            exceptions_total = self.store.filter_count(chat_id, "word_exception")
+            text = (
+                "⛔ 违禁词管理\n"
+                f"已添加：{words_total} 条 ｜ 精确例外：{exceptions_total} 条\n"
+                "使用下方按钮管理；支持一次添加多个违禁词。"
+            )
             keyboard.extend([
-                [self._button("➕ 私聊批量添加", f"w:{chat_id}:add"),
-                 self._button("➖ 私聊批量删除", f"w:{chat_id}:del")],
+                [self._button("➕ 添加违禁词", f"w:{chat_id}:add"),
+                 self._button("➖ 删除违禁词", f"w:{chat_id}:del")],
                 [self._button("🛡️ 添加精确例外", f"w:{chat_id}:except"),
                  self._button("❌ 删除精确例外", f"w:{chat_id}:unexcept")],
                 [self._button("🧪 测试关键词匹配", f"w:{chat_id}:test")],

@@ -314,6 +314,14 @@ class Store:
             "SELECT key,value FROM filters WHERE chat_id=? AND kind=? ORDER BY key",
             (int(chat_id), kind))]
 
+    def filter_count(self, chat_id, kind):
+        """Count rules without loading their values into the admin panel."""
+        if kind not in ("word", "domain", "word_exception"):
+            raise ValueError("未知规则类型")
+        return int(self.db.execute(
+            "SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
+            (int(chat_id), kind)).fetchone()[0])
+
     def add_filters_bulk(self, chat_id, kind, entries):
         """All-or-nothing import. Same-group, existing rules may be replaced."""
         if kind not in ("word", "word_exception"):

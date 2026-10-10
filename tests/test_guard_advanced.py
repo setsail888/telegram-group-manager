@@ -146,6 +146,57 @@ class GuardPanelTests(unittest.TestCase):
         self.assertTrue(any("智能反垃圾" in b["text"] for row in rows for b in row))
         self.assertTrue(any("切换群组" in b["text"] for row in rows for b in row))
 
+    def test_keyword_panel_never_expands_word_list_even_with_300_rules(self):
+        for start in range(0, 300, 80):
+            items = [(f"测试敏感词_{n:03d}", f"测试敏感词_{n:03d}")
+                     for n in range(start, min(start + 80, 300))]
+            self.store.add_filters_bulk(-1001, "word", items)
+        self.store.add_filter(-1001, "word_exception",
+                              "例外词|整句例外词", "例外词|整句例外词")
+        self.assertEqual(self.store.filter_count(-1001, "word"), 300)
+        self.assertEqual(self.store.filter_count(-1001, "word_exception"), 1)
+
+        # Toggling loose matching must not make the message longer or expose
+        # hundreds of stored sensitive phrases.
+        bodies = []
+        for loose in (False, True):
+            self.store.set(-1001, "word_loose_match", loose)
+            self.bot.handle_update(self.cb(1, "v:-1001:words"))
+            page = self.edited()
+            text = page["text"]
+            bodies.append(text)
+            self.assertIn("已添加：300 条", text)
+            self.assertIn("精确例外：1 条", text)
+            self.assertLess(len(text), 100)
+            self.assertNotIn("测试敏感词_000", text)
+            self.assertNotIn("测试敏感词_299", text)
+            self.assertNotIn("例外词|整句例外词", text)
+
+            buttons = [button for row in page["reply_markup"]["inline_keyboard"]
+                       for button in row]
+            add = [button for button in buttons
+                   if button["callback_data"] == "w:-1001:add"]
+            self.assertEqual(len(add), 1)
+            self.assertEqual(add[0]["text"], "➕ 添加违禁词")
+            self.assertFalse(any("私聊批量添加" in b["text"] for b in buttons))
+            self.assertTrue(any(b["callback_data"] == "w:-1001:del"
+                                for b in buttons))
+            self.assertTrue(any(b["callback_data"] ==
+                                "t:-1001:word_loose_match:words" for b in buttons))
+        self.assertEqual(bodies[0], bodies[1])
+
+    def test_keyword_panel_can_still_add_multiple_words_via_renamed_button(self):
+        self.bot.handle_update(self.cb(1, "v:-1001:words"))
+        buttons = [button for row in self.edited()["reply_markup"]["inline_keyboard"]
+                   for button in row]
+        add = next(b for b in buttons if b["text"] == "➕ 添加违禁词")
+        self.bot.handle_update(self.cb(1, add["callback_data"]))
+        self.bot.handle_update(self.private_msg(1, "推广广告,请加微信,刷单返佣"))
+        self.assertEqual(self.store.filter_count(-1001, "word"), 3)
+        self.bot.handle_update(self.cb(1, "v:-1001:words"))
+        self.assertIn("已添加：3 条", self.edited()["text"])
+        self.assertNotIn("推广广告", self.edited()["text"])
+
     def test_all_subpage_callback_data_fit_telegram_64_byte_limit(self):
         big_chat_id = -1001234567890123
         conf = DEFAULTS.copy()
