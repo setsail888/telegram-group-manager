@@ -112,6 +112,34 @@ exit 99
         self.assertFalse((self.project / ".env").exists())
         self.assertFalse(self.log.exists())
 
+    def test_help_uses_absolute_paths_from_unrelated_working_directory(self):
+        script = self.project / "scripts/server-manager.sh"
+        result = subprocess.run(
+            ["bash", str(script), "help"], cwd=self.base / "home",
+            env=self.env, capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f'bash "{script}" logs', result.stdout)
+        self.assertIn(f'bash "{script}" update', result.stdout)
+        self.assertNotIn("  bash scripts/server-manager.sh", result.stdout)
+
+    def test_install_log_hint_uses_absolute_path_from_home(self):
+        self.provision_env()
+        script = self.project / "scripts/server-manager.sh"
+        result = subprocess.run(
+            ["bash", str(script), "install"], cwd=self.base / "home",
+            env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f'bash "{script}" logs', result.stderr)
+        self.assertNotIn("：bash scripts/server-manager.sh logs", result.stderr)
+
+    def test_logs_follow_hint_uses_absolute_path_from_home(self):
+        script = self.project / "scripts/server-manager.sh"
+        result = subprocess.run(
+            ["bash", str(script), "logs"], cwd=self.base / "home",
+            env=self.env, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f'bash "{script}" logs-follow', result.stdout)
+
     def test_token_saved_safely_and_preserves_other_keys(self):
         result = self.run_source(
             f'env_put BOT_TOKEN "{self.token}"\n'

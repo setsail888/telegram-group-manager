@@ -256,7 +256,7 @@ show_status() {
 show_logs() {
   info "机器人最近 80 行日志："
   dc logs --tail=80 groupbot || :
-  info "持续观察：bash scripts/server-manager.sh logs-follow"
+  info "持续观察：bash \"${APP_DIR}/scripts/server-manager.sh\" logs-follow"
 }
 
 backup() {
@@ -317,7 +317,7 @@ install() {
   info "部署命令完成，以下是当前容器状态："
   dc ps
   info "接下来：私聊 @BotFather 创建并配置机器人，加入测试群设为管理员，发送 /check 和 /panel"
-  warn "首次启动请查看日志确认 Telegram 连接正常：bash scripts/server-manager.sh logs"
+  warn "首次启动请查看日志确认 Telegram 连接正常：bash \"${APP_DIR}/scripts/server-manager.sh\" logs"
 }
 
 update() {
@@ -430,18 +430,18 @@ uninstall_menu() {
 }
 
 help_menu() {
-  cat <<'HELP'
+  cat <<HELP
 
 GroupGuard 服务器一键管理
 
-  bash scripts/server-manager.sh               中文交互菜单
-  bash scripts/server-manager.sh install       安装或修复部署
-  bash scripts/server-manager.sh update        先备份再从 GitHub 更新
-  bash scripts/server-manager.sh backup        备份 SQLite（保留历史）
-  bash scripts/server-manager.sh configure     修改 Bot Token
-  bash scripts/server-manager.sh status        查看容器状态
-  bash scripts/server-manager.sh logs          最近 80 行日志
-  bash scripts/server-manager.sh logs-follow   实时日志（Ctrl+C 退出）
+  bash "${APP_DIR}/scripts/server-manager.sh"               中文交互菜单
+  bash "${APP_DIR}/scripts/server-manager.sh" install       安装或修复部署
+  bash "${APP_DIR}/scripts/server-manager.sh" update        先备份再从 GitHub 更新
+  bash "${APP_DIR}/scripts/server-manager.sh" backup        备份 SQLite（保留历史）
+  bash "${APP_DIR}/scripts/server-manager.sh" configure     修改 Bot Token
+  bash "${APP_DIR}/scripts/server-manager.sh" status        查看容器状态
+  bash "${APP_DIR}/scripts/server-manager.sh" logs          最近 80 行日志
+  bash "${APP_DIR}/scripts/server-manager.sh" logs-follow   实时日志（Ctrl+C 退出）
 
 重要：本项目不需要服务器域名、SSL 证书和任何对外开放端口。
 网页看板只绑定 127.0.0.1:8765，必须通过 SSH 隧道访问。
