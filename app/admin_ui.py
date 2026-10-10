@@ -10,7 +10,7 @@ from datetime import datetime
 from .moderation import normalize_domain, evaluate, WORD_MODES
 from .reply_rules import parse_keywords, parse_buttons, media_from_reply
 from .scheduler import parse_rule, next_occurrence, format_run
-from .word_library import parse_import, IMPORT_BYTES
+from .word_library import parse_import, IMPORT_BYTES, describe_hit
 from .membership import is_current_member
 
 
@@ -190,8 +190,10 @@ class AdminUI:
                     [r["key"] for r in self.bot.store.filters(cid, "domain")],
                     exceptions=policy.exceptions)
                 if not reason and conf["word_filter_enabled"]:
-                    hit = policy.pack_hit({"text": text}, loose=conf["word_loose_match"])
-                    reason = (f"分类词库：{hit['word']}" + ("（仅观察）" if hit["observe"] else "") if hit else None)
+                    hit = policy.hit({"text": text}, loose=conf["word_loose_match"], settings=conf)
+                    reason = describe_hit(hit, conf) if hit else None
+                elif reason == "违禁词":
+                    reason = describe_hit(policy.hit({"text": text}, loose=conf["word_loose_match"], settings=conf), conf)
                 self.cancel(uid)
                 self.bot.send(uid, "🧪 文字规则测试：" + (reason or "未命中") + "\n不包含图片、隐藏实体、频率或成员身份检查。",
                               reply_markup={"inline_keyboard": self.back(cid, "spam")})
@@ -340,8 +342,11 @@ class AdminUI:
             keyboard.append([add("🔎 搜索词库", "word_search")])
             keyboard.append([b("📚 分类词库", f"v:{cid}:wordpacks"), add("📥 文件导入", "word_import")])
             keyboard.append([b("📤 导出自定义词库", f"ad:{cid}:wordexport:0")])
+            keyboard.append([b("🈶 中文变体识别", f"v:{cid}:wordvariants")])
         elif page == "wordpacks":
             text, keyboard = self.bot.word_ui.home(cid)
+        elif page == "wordvariants":
+            text, keyboard = self.bot.word_ui.variants(cid)
         elif page == "raid":
             conf = self.bot.store.settings(cid)
             until = self.bot.store.raid_until(cid)
@@ -427,6 +432,8 @@ class AdminUI:
                 lines.append(f"#{row['id']} {stamp} · 消息{row['message_id']} · {row['target_id']} · {row['reason']} · {outcomes[row['outcome']]}" + (" · 已复核" if row['reviewed_by'] else ""))
                 if row.get("rule_key"):
                     lines.append(f"  规则：{row['rule_key']}" + (f" · 分类：{row['pack_id']}" if row.get("pack_id") else " · 自定义"))
+                if row.get("match_kind"):
+                    lines.append("  识别："+row["match_kind"])
                 buttons = [b(f"✓ 复核 #{row['id']}", f"ad:{cid}:review:{row['id']}")]
                 if str(cid).startswith("-100"):
                     buttons.append({"text": "查看原消息", "url": f"https://t.me/c/{str(cid)[4:]}/{row['message_id']}"})
@@ -486,7 +493,7 @@ class AdminUI:
                 draft = self._draft(uid, cid, arg, FORMS[arg][0])
                 bot.answer(qid)
                 return self._prompt(uid, draft)
-            if action in ("pack", "packmode", "packpreset", "packpage", "pexclude", "wordexport"):
+            if action in ("pack", "packmode", "packpreset", "packpage", "pexclude", "wordexport", "variantmode", "variantpreset"):
                 return bot.word_ui.callback(uid, cid, action, arg, mid, qid)
             if action == "word":
                 self.word_choice(uid, cid, arg)

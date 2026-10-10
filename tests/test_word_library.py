@@ -27,7 +27,7 @@ class LibraryDataTests(unittest.TestCase):
             self.assertIn(source["revision"], source["url"])
         self.assertIn("Apache License", (ROOT / "LICENSE-Apache-2.0").read_text(encoding="utf-8"))
         packs = catalog()
-        self.assertEqual(len(packs), 12)
+        self.assertEqual(len(packs), 13)
         self.assertGreater(len({w for p in packs.values() for w in p.words}), 6000)
         for pack in packs.values():
             self.assertTrue(all(2 <= len(w) <= 80 and normalize(w) == w for w in pack.words))
@@ -147,7 +147,7 @@ class LibraryWorkflowTests(unittest.TestCase):
 
     def test_library_modes_preview_commit_binding_and_replay(self):
         self.click("v:-1001:wordpacks")
-        self.assertIn("12类", self.page()["text"])
+        self.assertIn("13类", self.page()["text"])
         self.click("ad:-1001:packmode:task_scam_observe")
         d = dict(self.bot.admin_ui.drafts[1])
         self.assertFalse(self.store.pack_modes(-1001))

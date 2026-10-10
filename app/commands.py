@@ -16,6 +16,8 @@ from .points import (ADMIN_COMMANDS as POINT_ADMIN_COMMANDS,
 from .reply_rules import media_from_reply, parse_buttons, parse_keywords
 from .scheduler import format_run, next_occurrence, parse_new_schedule
 from .store import TOGGLES, NUMBER_LIMITS
+from .word_library import describe_hit
+from .variants import context_matches
 
 SWITCHES = {
     "links": "block_links", "forward": "block_forward",
@@ -378,17 +380,14 @@ def handle_command(bot, message):
         elif command == "wordtest":
             if not 2 <= len(argument) <= 1000:
                 raise ValueError("用法：/wordtest 测试文字（2–1000字，不会删除）")
-            hit = bot.store.word_policy(chat_id).hit({"text": argument}, loose=settings["word_loose_match"])
-            found = hit["word"] if hit else None
-            bot.send(chat_id, "🧪 违禁词测试（不处罚）："
-                     + (f"命中 {str(found)[:75]}" if found else "未命中关键词")
-                     + ("（分类词库仅观察）" if hit and hit["observe"] else ""))
+            hit = bot.store.word_policy(chat_id).hit({"text": argument}, loose=settings["word_loose_match"], settings=settings)
+            bot.send(chat_id, "🧪 违禁词测试（不处罚）：" + describe_hit(hit, settings))
         elif command in ("wordexcept", "delwordexcept"):
             phrase, sep, context = argument.partition("|")
             keyword, context = normalize(phrase.strip()), normalize(context.strip())
             if not sep or not 2 <= len(keyword) <= 80 or not 3 <= len(context) <= 200:
                 raise ValueError(f"用法：/{command} 违禁词 | 完整允许文本")
-            if keyword not in context and command == "wordexcept":
+            if command == "wordexcept" and not context_matches(keyword, context, settings):
                 raise ValueError("允许文本必须包含对应违禁词，才能避免错误配置")
             key = f"{keyword}|{context}"
             if command == "wordexcept":

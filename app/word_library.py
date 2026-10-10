@@ -25,6 +25,11 @@ class WordPack:
         from .ocr import compile_ocr_words
         return compile_ocr_words(self.words)
 
+    @cached_property
+    def variant_rules(self):
+        from .variants import VariantIndex
+        return VariantIndex(self.matcher.rules)
+
 
 @lru_cache(maxsize=1)
 def catalog():
@@ -33,6 +38,7 @@ def catalog():
     for definition in definitions:
         definition["words"] = definition["phrases"] + [a+b for a in definition.get("products", ())
                                                         for b in definition.get("suffixes", ())]
+    definitions.append(json.loads((ROOT / "short-words.json").read_text(encoding="utf-8")))
     for key, label in (("public_ads", "开源广告扩展"), ("public_adult", "开源成人词扩展"),
                        ("public_danger", "开源危险品词扩展")):
         definitions.append({"id": key, "name": label, "recommended": False,
@@ -108,6 +114,35 @@ class WordPolicy:
         from .ocr import compile_ocr_words
         return compile_ocr_words(tuple(r[0] for r in self.custom.rules), self.modes)
 
+    @cached_property
+    def variant_rules(self):
+        from .variants import VariantIndex
+        return VariantIndex(self.custom.rules)
+
+    def variant_hit(self, message, settings, *, ocr=False):
+        from .variants import candidates
+        observed = None
+        for parts, traditional, observe, kind, context in candidates(message, settings, ocr=ocr):
+            # OCR waivers use the same compact comparison as the OCR base matcher.
+            waived = self.exceptions
+            if ocr:
+                from .moderation import compact
+                waived = {(phrase, context) for phrase, allowed in self.exceptions
+                          if compact(allowed) == compact(context)}
+            sources = [(self, "", False, ())] + [(p, p.id, mode == "observe", self.excluded)
+                                                  for p, mode in self.packs]
+            for source, pack_id, pack_observe, excluded in sources:
+                for part in parts:
+                    word = source.variant_rules.find(part, traditional=traditional, ocr=ocr,
+                                                     context=context, waived=waived, excluded=excluded)
+                    if word is None:
+                        continue
+                    hit = {"word": word, "pack": pack_id, "observe": observe or pack_observe, "match_kind": kind}
+                    if not hit["observe"]:
+                        return hit
+                    observed = observed or hit
+        return observed
+
     def pack_hit(self, message, *, loose=False, include_observe=True):
         for mode in ("enforce", "observe") if include_observe else ("enforce",):
             for pack, state in self.packs:
@@ -119,6 +154,21 @@ class WordPolicy:
                     return {"word": word, "pack": pack.id, "observe": mode == "observe"}
         return None
 
-    def hit(self, message, *, loose=False):
+    def hit(self, message, *, loose=False, settings=None):
         word = message_word_hit(message, self.custom, loose=loose, exceptions=self.exceptions)
-        return {"word": word, "pack": "", "observe": False} if word is not None else self.pack_hit(message, loose=loose)
+        if word is not None:
+            return {"word": word, "pack": "", "observe": False}
+        direct = self.pack_hit(message, loose=loose)
+        if direct and not direct["observe"]:
+            return direct
+        variant = self.variant_hit(message, settings or {})
+        return variant if variant and not variant["observe"] else direct or variant
+
+
+def describe_hit(hit, settings):
+    if not hit:
+        return "未命中关键词"
+    suffix = " · "+hit["match_kind"] if hit.get("match_kind") else " · 原规则匹配"
+    status = "总开关已关闭" if not settings["word_filter_enabled"] else (
+        "仅观察" if settings["observe_only"] or hit["observe"] else "按本群违禁词处罚")
+    return f"命中 {hit['word'][:80]}{suffix}（{status}）"

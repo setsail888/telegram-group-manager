@@ -1,0 +1,20 @@
+[
+  {
+    "file": "opencc-TSCharacters.txt",
+    "upstream_file": "data/dictionary/TSCharacters.txt",
+    "repository": "https://github.com/BYVoid/OpenCC",
+    "revision": "556ed22496d650bd0b13b6c163be9814637970ae",
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/556ed22496d650bd0b13b6c163be9814637970ae/data/dictionary/TSCharacters.txt",
+    "license": "Apache-2.0",
+    "sha256": "6b5a0a799bea2bb22c001f635eaa3fc2904310f0c08addbff275477a80ecf09a"
+  },
+  {
+    "file": "LICENSE-OpenCC",
+    "upstream_file": "LICENSE",
+    "repository": "https://github.com/BYVoid/OpenCC",
+    "revision": "556ed22496d650bd0b13b6c163be9814637970ae",
+    "url": "https://raw.githubusercontent.com/BYVoid/OpenCC/556ed22496d650bd0b13b6c163be9814637970ae/LICENSE",
+    "license": "Apache-2.0",
+    "sha256": "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+  }
+]

@@ -5,6 +5,7 @@ from collections import Counter
 
 from .moderation import WORD_MODES
 from .word_library import catalog, PACK_MODES
+from .variants import VARIANT_SETTINGS
 
 
 class WordUI:
@@ -27,9 +28,29 @@ class WordUI:
                  f"ad:{cid}:pack:{pack.id}")] for pack in packs.values()]
         kb += [[b("🧪 定向分类全部先观察", f"ad:{cid}:packpreset:recommended")],
                [b("🧪 所有分类全部先观察", f"ad:{cid}:packpreset:all")],
+               [b("🈶 中文变体识别", f"v:{cid}:wordvariants")],
                [b("➖ 排除内置词", f"ad:{cid}:begin:pack_exclude"),
                 b("➕ 恢复内置词", f"ad:{cid}:begin:pack_restore")],
                [b("⬅️ 违禁词管理", f"v:{cid}:words")]]
+        return text, kb
+
+    def variants(self, cid):
+        modes, b = self.bot.store.variant_modes(cid), self.bot._button
+        text = ("🈶 中文变体识别\n只增强已添加或已启用分类中的「包含」规则；整词、整句规则保持原精度。\n"
+                "繁简字形：賭博→赌博、刷單→刷单（字表转换，不是完整语义转换）。\n"
+                "定向同音／拼音：唰单／shuadan→刷单；菠菜需同句附近有平台、投注等提示词。不是任意同音字通杀。\n"
+                "短词拆字增强：刷⭐单→刷单，允许1–3个间隔符，不跨换行或按钮；可能误伤正常引用。\n"
+                "三项默认关闭；组合命中时，所需功能或分类任一为观察，就仅观察。总开关和全局观察优先。\n"
+                "先在分类词库选择「两字短词（严格）」或添加自定义词，再测试并观察。\n\n"
+                + "\n".join(f"{label}：{PACK_MODES[modes[key]]}" for key, (_, label) in VARIANT_SETTINGS.items()))
+        kb = []
+        for key, (_, label) in VARIANT_SETTINGS.items():
+            kb.append([b(f"{label} · 当前{PACK_MODES[modes[key]]}", f"v:{cid}:wordvariants")])
+            kb.append([b(("✅ " if modes[key] == mode else "") + mode_label, f"ad:{cid}:variantmode:{key}_{mode}")
+                       for mode, mode_label in PACK_MODES.items()])
+        kb += [[b("🧪 三项全部先观察", f"ad:{cid}:variantpreset:observe")],
+               [b("🧪 测试关键词", f"w:{cid}:test")],
+               [b("📚 分类词库", f"v:{cid}:wordpacks")]] + self.bot.admin_ui.back(cid, "words")
         return text, kb
 
     def detail(self, uid, cid, pack_id, page=0, mid=None):
@@ -94,7 +115,21 @@ class WordUI:
                 kb.insert(0, [bot._button("📤 下载下一部分", f"ad:{cid}:wordexport:{token}")])
             return bot.send(uid, f"✅ 已导出{count}条。" + ("还有更多，请下载下一部分。" if more else "已到末尾。"), reply_markup={"inline_keyboard": kb})
         values = {"revision": store.word_revision(cid)}
-        if action in ("packmode", "packpreset"):
+        if action in ("variantmode", "variantpreset"):
+            if action == "variantmode":
+                feature, mode = arg.rsplit("_", 1)
+                if feature not in VARIANT_SETTINGS or mode not in PACK_MODES:
+                    raise ValueError("未知变体识别模式。")
+                values["changes"] = {feature: mode}
+            elif arg == "observe":
+                values["changes"] = {key: "observe" for key in VARIANT_SETTINGS}
+            else:
+                raise ValueError("未知变体组合。")
+            values["expected"] = store.variant_modes(cid)
+            summary = "\n".join(f"{VARIANT_SETTINGS[key][1]} → {PACK_MODES[mode]}" for key, mode in values["changes"].items())
+            summary += "\n仅增强已启用的包含规则；短词及同音可能误伤引用，请先测试观察。确认请求十分钟内有效，设置保存后持续生效。"
+            op = "library_variants"
+        elif action in ("packmode", "packpreset"):
             if action == "packmode":
                 pack_id, mode = arg.rsplit("_", 1)
                 if pack_id not in catalog() or mode not in PACK_MODES:
@@ -113,7 +148,7 @@ class WordUI:
                 raise ValueError("词库按钮已失效。")
             values["text"] = choice["key"]
             op, summary = "pack_exclude", "从本群内置词库排除："+choice["key"]+"\n同名自定义规则仍生效。"
-        draft = admin._draft(uid, cid, op, "wordpacks", values)
+        draft = admin._draft(uid, cid, op, "wordvariants" if op == "library_variants" else "wordpacks", values)
         bot.answer(qid)
         return admin._preview(uid, draft, summary, mid)
 
@@ -123,6 +158,11 @@ class WordUI:
         if op == "word_import":
             count = store.import_words(cid, values["content"]["entries"], expected=values["revision"])
             return f"新增{count}条自定义词，已有规则保持原样。"
+        if op == "library_variants":
+            if "enforce" in values["changes"].values() and not self.bot.bot_can(cid, "can_delete_messages"):
+                raise ValueError("机器人缺少删除消息权限。")
+            store.set_variant_modes(cid, values["changes"], expected=values["expected"], revision=values["revision"])
+            return "中文变体识别已更新；已保存的设置持续生效。"
         if op == "library_modes":
             if "enforce" in values["changes"].values() and not self.bot.bot_can(cid, "can_delete_messages"):
                 raise ValueError("机器人缺少删除消息权限。")

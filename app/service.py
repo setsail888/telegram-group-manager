@@ -1,6 +1,7 @@
 """Telegram event routing, authorization, private settings and join challenge."""
 import json
 import logging
+import math
 import os
 import random
 import re
@@ -19,6 +20,8 @@ from .admin_ui import AdminUI
 from .member_ui import MemberUI
 from .raid import JoinGuard
 from .word_ui import WordUI
+from .word_library import describe_hit
+from .variants import context_matches
 from .membership import is_current_member
 
 LOG = logging.getLogger(__name__)
@@ -816,7 +819,7 @@ class GroupBot:
             keyword, sentence = normalize(phrase.strip()), normalize(context.strip())
             if not sep or not 2 <= len(keyword) <= 80 or not 3 <= len(sentence) <= 200:
                 raise ValueError("请输入：违禁词 | 完整允许文本（例如：广告 | 学校广告设计）")
-            if operation == "except" and keyword not in sentence:
+            if operation == "except" and not context_matches(keyword, sentence, self.store.settings(chat_id)):
                 raise ValueError("允许文本必须包含要豁免的违禁词")
             key = f"{keyword}|{sentence}"
             if operation == "except":
@@ -826,13 +829,10 @@ class GroupBot:
             self.log(chat_id, "通过私聊修改关键词精确例外", actor=uid)
             return "✅ 已更新精确例外（只对完整相同的消息豁免对应关键词）。"
         if operation == "test":
+            settings = self.store.settings(chat_id)
             hit = self.store.word_policy(chat_id).hit({"text": text},
-                loose=self.store.settings(chat_id)["word_loose_match"])
-            found = hit["word"] if hit else None
-            return ("🧪 测试结果：" + (
-                f"命中 {str(found)[:70]}" if found else "没有命中违禁词") +
-                ("（分类词库仅观察）" if hit and hit["observe"] else "") +
-                "\n此操作不会处罚任何成员。")
+                loose=settings["word_loose_match"], settings=settings)
+            return "🧪 测试结果：" + (describe_hit(hit, settings) if hit else "没有命中违禁词") + "\n此操作不会处罚任何成员。"
         raise ValueError("未知的违禁词编辑操作")
 
     def _private_message(self, message):
@@ -1492,7 +1492,7 @@ class GroupBot:
             word_hit = {"word": message_word_hit(message, policy.custom, loose=settings["word_loose_match"],
                                                  exceptions=policy.exceptions), "pack": "", "observe": False}
         if not reason and settings["word_filter_enabled"]:
-            word_hit = policy.pack_hit(message, loose=settings["word_loose_match"])
+            word_hit = policy.hit(message, loose=settings["word_loose_match"], settings=settings)
             if word_hit:
                 reason = "违禁词"
         if reason:
@@ -1505,7 +1505,8 @@ class GroupBot:
                 return False
             if admin_status(fresh):
                 return True
-            details = {"rule_key": word_hit["word"], "pack_id": word_hit["pack"]} if word_hit else {}
+            details = {"rule_key": word_hit["word"], "pack_id": word_hit["pack"],
+                       "match_kind": word_hit.get("match_kind", "")} if word_hit else {}
             if settings["observe_only"] or word_hit and word_hit["observe"]:
                 self.store.audit(chat_id, message["message_id"], user_id, reason, "observed", **details)
                 return True
@@ -1656,7 +1657,7 @@ class GroupBot:
             if mode == "off" or not settings["word_filter_enabled"]:
                 continue
             policy = self.store.word_policy(cid)
-            pack_id, pack_observe = "", False
+            pack_id, pack_observe, match_kind = "", False, ""
             matched = matched_words(
                 text, confidence, (),
                 threshold=settings["ocr_confidence"],
@@ -1673,6 +1674,11 @@ class GroupBot:
                             break
                     if matched:
                         break
+            if (not matched or pack_observe) and math.isfinite(confidence) and confidence >= settings["ocr_confidence"]:
+                variant = policy.variant_hit({"text": text}, settings, ocr=True)
+                if variant and (not matched or not variant["observe"]):
+                    matched, pack_id, pack_observe = [variant["word"]], variant["pack"], variant["observe"]
+                    match_kind = variant["match_kind"]
             if not matched:
                 continue
             try:
@@ -1682,7 +1688,7 @@ class GroupBot:
             if admin_status(person):
                 continue
             self.store.stat(cid, "ocr_hits")
-            details = {"rule_key": matched[0], "pack_id": pack_id}
+            details = {"rule_key": matched[0], "pack_id": pack_id, "match_kind": match_kind}
             if mode == "review" or settings["observe_only"] or pack_observe:
                 self.store.audit(cid, event["message_id"], uid, "OCR违禁词", "observed", "ocr", **details)
                 # No raw image, OCR text, or untrusted URL is stored in logs.

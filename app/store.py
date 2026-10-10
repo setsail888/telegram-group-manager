@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from .moderation import WORD_MODES, normalize
 from .word_library import WordPolicy, catalog, PACK_MODES
+from .variants import VARIANT_SETTINGS
 
 DEFAULTS = {
     "block_links": True,
@@ -28,6 +29,9 @@ DEFAULTS = {
     "repeat_photo_window": 60,
     "spam_guard_enabled": False,
     "word_loose_match": False,
+    "word_traditional_mode": "off",
+    "word_homophone_mode": "off",
+    "word_short_split_mode": "off",
     "word_filter_enabled": True,
     "word_penalty": "delete",
     "word_mute_minutes": 10,
@@ -319,7 +323,7 @@ class Store:
             if column not in existing:
                 self.db.execute(f"ALTER TABLE replies ADD COLUMN {column} {definition}")
         audit_columns = {r[1] for r in self.db.execute("PRAGMA table_info(moderation_audit)")}
-        for column in ("rule_key", "pack_id"):
+        for column in ("rule_key", "pack_id", "match_kind"):
             if column not in audit_columns:
                 self.db.execute(f"ALTER TABLE moderation_audit ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
         # Database triggers also invalidate caches after direct SQL/another connection.
@@ -391,6 +395,8 @@ class Store:
             raise ValueError("OCR 信心阈值范围为 40–95")
         if name == "word_penalty" and value not in ("delete", "mute"):
             raise ValueError("违禁词处罚只能为 delete 或 mute")
+        if name in {row[0] for row in VARIANT_SETTINGS.values()} and value not in PACK_MODES:
+            raise ValueError("变体识别模式只能为 off、observe、enforce")
         if name == "flood_penalty" and value not in ("delete", "mute"):
             raise ValueError("防刷屏处罚只能为 delete 或 mute")
         if name == "word_notice_seconds" and (
@@ -526,6 +532,25 @@ class Store:
         while len(self._word_cache) > 8:
             self._word_cache.popitem(last=False)
         return policy
+
+    def variant_modes(self, chat_id):
+        settings = self.settings(chat_id)
+        return {key: settings[name] for key, (name, _) in VARIANT_SETTINGS.items()}
+
+    def set_variant_modes(self, chat_id, changes, *, expected=None, revision=None):
+        if not changes or any(key not in VARIANT_SETTINGS or mode not in PACK_MODES for key, mode in changes.items()):
+            raise ValueError("未知变体识别模式。")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if ((expected is not None and self.variant_modes(chat_id) != expected)
+                    or revision is not None and self.word_revision(chat_id) != revision):
+                raise ValueError("词库或变体设置已变化，请重新预览。")
+            for key, mode in changes.items():
+                self.set(chat_id, VARIANT_SETTINGS[key][0], mode)
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
 
     def set_pack_modes(self, chat_id, changes, *, expected=None):
         if not changes or any(key not in catalog() or mode not in PACK_MODES for key, mode in changes.items()):
@@ -733,22 +758,23 @@ class Store:
                         (int(chat_id), int(user_id)))
         return self.pending(chat_id, user_id)
 
-    def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None, *, rule_key="", pack_id=""):
+    def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None, *, rule_key="", pack_id="", match_kind=""):
         """Bounded metadata only. Observation never enters punitive strike history."""
         if outcome not in ("observed", "deleted", "failed") or source not in ("text", "ocr", "channel"):
             raise ValueError("未知审核状态")
         when = int(time.time() if now is None else now)
         self.db.execute(
-            "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at,rule_key,pack_id) "
-            "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
+            "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at,rule_key,pack_id,match_kind) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
             "reason=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reason ELSE excluded.reason END,"
             "outcome=CASE WHEN moderation_audit.outcome='deleted' THEN 'deleted' ELSE excluded.outcome END,"
             "reviewed_by=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reviewed_by ELSE NULL END,"
             "rule_key=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.rule_key ELSE excluded.rule_key END,"
             "pack_id=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.pack_id ELSE excluded.pack_id END,"
+            "match_kind=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.match_kind ELSE excluded.match_kind END,"
             "created_at=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.created_at ELSE excluded.created_at END",
             (int(chat_id), int(message_id), int(target_id), str(reason)[:100], source, outcome, when,
-             str(rule_key or "")[:80], str(pack_id)[:40]))
+             str(rule_key or "")[:80], str(pack_id)[:40], str(match_kind)[:80]))
         self.db.execute("DELETE FROM moderation_audit WHERE created_at<?", (when - 30*86400,))
         self.db.execute("DELETE FROM moderation_audit WHERE chat_id=? AND id NOT IN "
                         "(SELECT id FROM moderation_audit WHERE chat_id=? ORDER BY id DESC LIMIT 1000)",

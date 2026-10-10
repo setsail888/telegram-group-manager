@@ -4,5 +4,7 @@ config.sample text eol=lf
 # Preserve upstream bytes so source hashes stay reproducible on every platform.
 app/wordlists/public_*.txt -text -whitespace
 app/wordlists/LICENSE-Apache-2.0 -text
+app/wordlists/opencc-*.txt -text -whitespace
+app/wordlists/LICENSE-OpenCC -text -whitespace
 app/wordlists/curated_*.txt text eol=lf
 app/wordlists/*.json text eol=lf
