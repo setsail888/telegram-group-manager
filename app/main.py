@@ -1,0 +1,119 @@
+"""Long-polling entry point. No incoming HTTP port, public IP, domain or SSL needed."""
+import logging
+import os
+import signal
+import time
+
+from .api import TelegramAPI, TelegramAPIError
+from .config import Config
+from .scheduler import process_due_schedules
+from .service import GroupBot
+from .store import Store
+
+LOG = logging.getLogger("groupbot")
+_running = True
+
+
+def _stop(_signal, _frame):
+    global _running
+    _running = False
+
+
+def run(api, store, config):
+    global _running
+    identity = api.call("getMe")
+    bot = GroupBot(api, store, identity["id"], identity["username"], config.owner_ids)
+    # A new dedicated token can safely switch from webhook to polling.
+    # No pending updates are deliberately discarded.
+    api.call("deleteWebhook", drop_pending_updates=False)
+    api.safe("setMyCommands", commands=[
+        {"command": "start", "description": "打开中文群组管理面板"},
+        {"command": "panel", "description": "群组管理面板"},
+        {"command": "help", "description": "查看指令"},
+        {"command": "rules", "description": "查看群规"},
+        {"command": "stats", "description": "今日群组数据"},
+        {"command": "statweek", "description": "最近7天群组统计"},
+        {"command": "schedule", "description": "管理员定时公告"},
+        {"command": "checkin", "description": "签到领取积分（需群管理员启用）"},
+        {"command": "points", "description": "查看自己在本群的积分"},
+        {"command": "pointtop", "description": "查看本群积分排行榜"},
+        {"command": "dban", "description": "回复广告消息静默封禁（管理员）"},
+    ])
+    LOG.info("机器人已启动，使用长轮询模式（不暴露 Token）。")
+    backoff = 1
+    last_cleanup = 0
+    last_scheduler = 0
+    last_prune = 0
+    while _running:
+        try:
+            bot.drain_ocr()
+        except Exception:
+            LOG.exception("OCR结果处理异常，本轮已跳过")
+        if time.monotonic() - last_cleanup >= 30:
+            last_cleanup = time.monotonic()
+            try:
+                bot.cleanup_expired()
+            except Exception:
+                LOG.exception("验证过期清理失败")
+        if time.monotonic() - last_scheduler >= 10:
+            last_scheduler = time.monotonic()
+            try:
+                process_due_schedules(bot)
+            except Exception:
+                LOG.exception("定时消息调度失败")
+        if time.monotonic() - last_prune >= 24 * 3600:
+            last_prune = time.monotonic()
+            try:
+                store.prune_activity(retain_days=30)
+            except Exception:
+                LOG.exception("活跃记录清理失败")
+        try:
+            updates = api.call(
+                "getUpdates", offset=store.offset() + 1,
+                timeout=config.poll_timeout, limit=50,
+                allowed_updates=["message", "edited_message", "channel_post",
+                                 "callback_query", "my_chat_member"])
+            backoff = 1
+            for update in updates:
+                update_id = update.get("update_id")
+                if not isinstance(update_id, int) or update_id <= store.offset():
+                    continue
+                try:
+                    bot.handle_update(update)
+                except Exception:
+                    LOG.exception("处理单条更新失败 update_id=%s", update_id)
+                # Consume a poison update rather than entering an infinite loop.
+                store.save_offset(update_id)
+        except TelegramAPIError as exc:
+            LOG.warning("Telegram 连接出现问题：%s", exc)
+            pause = max(backoff, min(60, int(exc.retry_after or 0)))
+            for _ in range(pause):
+                if not _running:
+                    break
+                time.sleep(1)
+            backoff = min(backoff * 2, 30)
+    bot.ocr.shutdown()
+
+
+def main():
+    logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
+                        format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    signal.signal(signal.SIGTERM, _stop)
+    signal.signal(signal.SIGINT, _stop)
+    try:
+        cfg = Config.from_env()
+    except ValueError as exc:
+        LOG.error("%s", exc)
+        raise SystemExit(2) from None
+    store = Store(cfg.db_path, timezone=os.getenv("TZ", "Asia/Shanghai"))
+    try:
+        run(TelegramAPI(cfg.token, cfg.api_base), store, cfg)
+    except TelegramAPIError as exc:
+        LOG.error("启动失败：%s", exc)
+        raise SystemExit(1) from None
+    finally:
+        store.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,52 @@
+services:
+  groupbot:
+    build:
+      context: .
+      args:
+        WITH_OCR: ${WITH_OCR:-0}
+    restart: unless-stopped
+    stop_grace_period: 40s
+    env_file: .env
+    volumes:
+      - bot_data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    init: true
+  dashboard:
+    profiles: ["dashboard"]
+    build: .
+    command: ["python", "-m", "app.dashboard"]
+    restart: unless-stopped
+    environment:
+      DB_PATH: /app/data/bot.sqlite3
+      DASHBOARD_BIND: 0.0.0.0
+      DASHBOARD_PORT: "8765"
+      DASHBOARD_TOKEN: ${DASHBOARD_TOKEN:-}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - bot_data:/app/data:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    init: true
+volumes:
+  bot_data:

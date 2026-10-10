@@ -1,0 +1,14 @@
+# 复制成 .env 后填入自己的 BotFather Token。切勿上传真实密钥。
+BOT_TOKEN=PASTE_YOUR_BOTFATHER_TOKEN_HERE
+OWNER_IDS=
+DB_PATH=/app/data/bot.sqlite3
+API_BASE=https://api.telegram.org
+POLL_TIMEOUT=25
+TZ=Asia/Shanghai
+# 可选：网页登录专用随机密钥，建议用 openssl rand -hex 32 生成。
+# 未设置时，只启动 groupbot 完全不受影响。不要使用 BOT_TOKEN 充当面板密钥。
+DASHBOARD_TOKEN=
+# 可选：本地中文 OCR。需要先构建 WITH_OCR=1 的镜像。
+# 默认关闭 OCR，机器人不会主动下载群图片用于 OCR。
+WITH_OCR=0
+OCR_ENABLED=0
