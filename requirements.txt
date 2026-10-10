@@ -1,0 +1,2 @@
+# Reuse HTTPS/TLS connections to Telegram, including proxy-aware sessions.
+requests==2.32.5

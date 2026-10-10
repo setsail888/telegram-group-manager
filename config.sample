@@ -12,3 +12,6 @@ DASHBOARD_TOKEN=
 # 默认关闭 OCR，机器人不会主动下载群图片用于 OCR。
 WITH_OCR=0
 OCR_ENABLED=0
+# 可选排查按钮卡顿：设为 1 时记录每次非轮询 API 请求及按钮处理耗时。
+# 故障排查结束后恢复 0，避免在活跃群产生大量 INFO 日志。
+LATENCY_DEBUG=0

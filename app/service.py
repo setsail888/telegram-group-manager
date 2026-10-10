@@ -115,8 +115,14 @@ class GroupBot:
         return self.api.safe("sendMessage", chat_id=chat_id, text=str(text)[:4000], **kwargs)
 
     def answer(self, query_id, text="", alert=False):
-        self.api.safe("answerCallbackQuery", callback_query_id=query_id,
-                      text=str(text)[:190], show_alert=alert)
+        params = {"callback_query_id": query_id,
+                  "text": str(text)[:190], "show_alert": alert}
+        # After authorization, a routine ACK and page edit can run in
+        # parallel. Important permission/error alerts remain synchronous.
+        background = getattr(self.api, "answer_background", None)
+        if not alert and callable(background) and background(**params):
+            return
+        self.api.safe("answerCallbackQuery", **params)
 
     def log(self, chat_id, action, actor=None, target=None):
         # Logging is best effort and intentionally never shows moderation in the group.
@@ -221,9 +227,13 @@ class GroupBot:
         return self._edit_or_send(
             user_id, message_id, "📋 选择要管理的群组：", keyboard)
 
-    def _private_panel(self, user_id, chat_id, message_id=None):
+    def _private_panel(self, user_id, chat_id, message_id=None, *,
+                       verified_admin=False):
         info = self.store.chat(chat_id)
-        if not info or not self.is_admin(chat_id, user_id):
+        # A callback has already performed a *fresh* getChatMember call.
+        # A second identical network request on the same click adds latency
+        # without meaningfully improving authorization.
+        if not info or (not verified_admin and not self.is_admin(chat_id, user_id)):
             return self._edit_or_send(user_id, message_id, "没有权限管理这个群组。")
         settings = self.store.settings(chat_id)
         keyboard = []
@@ -270,9 +280,10 @@ class GroupBot:
             self._button("⚙️ 返回群组设置", f"g:{chat_id}"),
         ]]}
 
-    def _private_word_list(self, user_id, chat_id, page=0, message_id=None):
+    def _private_word_list(self, user_id, chat_id, page=0, message_id=None, *,
+                           verified_admin=False):
         """Separate, bounded list; the main keyword page never shows entries."""
-        if not self.is_admin(chat_id, user_id):
+        if not verified_admin and not self.is_admin(chat_id, user_id):
             return self._edit_or_send(user_id, message_id, "没有权限。")
         count = self.store.filter_count(chat_id, "word")
         last_page = max(0, (count - 1) // 8)
@@ -296,8 +307,9 @@ class GroupBot:
             f"第 {page + 1}/{last_page + 1} 页\n\n{listing}",
             keyboard)
 
-    def _private_view(self, user_id, chat_id, what, message_id):
-        if not self.is_admin(chat_id, user_id):
+    def _private_view(self, user_id, chat_id, what, message_id, *,
+                      verified_admin=False):
+        if not verified_admin and not self.is_admin(chat_id, user_id):
             return self._edit_or_send(user_id, message_id, "没有权限。")
         keyboard = []
         conf = self.store.settings(chat_id)
@@ -659,12 +671,14 @@ class GroupBot:
         item = self.store.schedule(chat_id, task_id)
         if not item:
             self.answer(query_id, "任务不存在或已经删除。", alert=True)
-            return self._private_view(user_id, chat_id, "schedules", message_id)
+            return self._private_view(
+                user_id, chat_id, "schedules", message_id, verified_admin=True)
         if action == "sx":
             self.store.delete_schedule(chat_id, task_id)
             self.log(chat_id, f"删除定时公告 #{task_id}", actor=user_id)
             self.answer(query_id, "任务已删除")
-            return self._private_view(user_id, chat_id, "schedules", message_id)
+            return self._private_view(
+                user_id, chat_id, "schedules", message_id, verified_admin=True)
         if action == "sp":
             enabled = not bool(item["enabled"])
             if enabled:
@@ -966,9 +980,13 @@ class GroupBot:
                                else f"防刷屏提醒：约 {seconds} 秒")
                 page = "floodnotice"
             self.answer(qid, "✅ " + description)
+            updated = self._private_view(
+                user_id, chat_id, page, message.get("message_id"),
+                verified_admin=True)
+            # Deliver the requested page before sending the optional
+            # audit message to a second Telegram chat (another API RTT).
             self.log(chat_id, description, actor=user_id)
-            return self._private_view(
-                user_id, chat_id, page, message.get("message_id"))
+            return updated
         if parts[0] in ("wl", "ws", "wp", "wn"):
             if len(parts) != 3:
                 return self.answer(qid, "违禁词按钮参数无效", alert=True)
@@ -982,7 +1000,8 @@ class GroupBot:
                     return self.answer(qid, "页码超出范围", alert=True)
                 self.answer(qid)
                 return self._private_word_list(
-                    user_id, chat_id, page, message.get("message_id"))
+                    user_id, chat_id, page, message.get("message_id"),
+                    verified_admin=True)
             conf = self.store.settings(chat_id)
             if operation == "ws":
                 if setting not in ("on", "off"):
@@ -1017,10 +1036,13 @@ class GroupBot:
                 self.store.set(chat_id, "word_notice_seconds", seconds)
                 label = "删除提醒：关闭" if not seconds else f"删除提醒：约 {seconds} 秒"
             self.answer(qid, "✅ " + label)
-            self.log(chat_id, label, actor=user_id)
             page = "wordpenalty" if operation == "wp" else (
                 "wordnotice" if operation == "wn" else "words")
-            return self._private_view(user_id, chat_id, page, message.get("message_id"))
+            updated = self._private_view(
+                user_id, chat_id, page, message.get("message_id"),
+                verified_admin=True)
+            self.log(chat_id, label, actor=user_id)
+            return updated
         if parts[0] == "w":
             if len(parts) != 3 or parts[2] not in WORD_OPERATIONS:
                 return self.answer(qid, "未知违禁词管理操作", alert=True)
@@ -1045,7 +1067,9 @@ class GroupBot:
             return
         if parts[0] == "g" and len(parts) == 2:
             self.answer(qid)
-            return self._private_panel(user_id, chat_id, message.get("message_id"))
+            return self._private_panel(
+                user_id, chat_id, message.get("message_id"),
+                verified_admin=True)
         if parts[0] == "n":
             if len(parts) != 5:
                 return self.answer(qid, "数字设置按钮参数无效", alert=True)
@@ -1067,11 +1091,16 @@ class GroupBot:
                 return self.answer(qid, f"范围必须在 {low}–{high} 之间", alert=True)
             self.store.set(chat_id, key, proposed)
             self.answer(qid, f"✅ {key} = {proposed}")
+            updated = self._private_view(
+                user_id, chat_id, origin, message.get("message_id"),
+                verified_admin=True)
             self.log(chat_id, f"设置 {key}：{previous} → {proposed}", actor=user_id)
-            return self._private_view(user_id, chat_id, origin, message.get("message_id"))
+            return updated
         if parts[0] == "v" and len(parts) == 3:
             self.answer(qid)
-            return self._private_view(user_id, chat_id, parts[2], message.get("message_id"))
+            return self._private_view(
+                user_id, chat_id, parts[2], message.get("message_id"),
+                verified_admin=True)
         if parts[0] in ("s", "sd", "sp", "sx") and len(parts) == 3:
             try:
                 task_id = int(parts[2])
@@ -1113,9 +1142,13 @@ class GroupBot:
         self.store.set(chat_id, action, not current)
         self.answer(qid, "设置已保存")
         if origin:
-            self._private_view(user_id, chat_id, origin, message.get("message_id"))
+            self._private_view(
+                user_id, chat_id, origin, message.get("message_id"),
+                verified_admin=True)
         else:
-            self._private_panel(user_id, chat_id, message.get("message_id"))
+            self._private_panel(
+                user_id, chat_id, message.get("message_id"),
+                verified_admin=True)
         self.log(chat_id, f"开关 {action} → {not current}", actor=user_id)
 
     def _verify(self, query):
