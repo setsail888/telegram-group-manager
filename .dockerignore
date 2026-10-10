@@ -12,3 +12,5 @@ __pycache__
 *.db-shm
 *.log
 *.bak
+scripts/
+install.sh
