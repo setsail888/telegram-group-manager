@@ -51,6 +51,7 @@ PAGE_SWITCHES = {
              ("⚖️ 自动禁言", "auto_mute_enabled")),
     "flood": (("🚦 防刷屏", "anti_flood"),
               ("🖼️ 媒体连发限制", "media_flood_enabled")),
+    "floodmedia": (("🖼️ 媒体连发限制", "media_flood_enabled"),),
     "links": (("🔗 链接拦截", "block_links"),),
     "forward": (("🔁 禁止转发", "block_forward"),),
     "words": (("🔎 拆字违禁词", "word_loose_match"),),
@@ -71,10 +72,18 @@ PAGE_NUMBERS = {
               ("repeat_window", "重复判断（秒）", 5),
               ("media_flood_limit", "媒体连发条数", 1),
               ("media_flood_window", "媒体窗口（秒）", 5)),
+    "floodcount": (("flood_limit", "触发条数", 1),),
+    "floodinterval": (("flood_window", "检测间隔（秒）", 5),),
+    "floodrepeat": (("repeat_limit", "重复消息次数", 1),
+                    ("repeat_window", "重复判断（秒）", 5)),
+    "floodmedia": (("media_flood_limit", "媒体连发条数", 1),
+                   ("media_flood_window", "媒体窗口（秒）", 5)),
+    "floodpenalty": (("flood_mute_minutes", "刷屏禁言分钟", 5),),
     "members": (("name_length_limit", "允许昵称最大长度", 5),),
     "wordpenalty": (("word_mute_minutes", "违禁词禁言分钟", 5),),
 }
 WORD_OPERATIONS = {"add", "del", "except", "unexcept", "test"}
+FLOOD_REASONS = frozenset(("短时刷屏", "重复刷屏", "媒体刷屏"))
 
 
 def admin_status(member):
@@ -100,7 +109,8 @@ class GroupBot:
         self._reply_time = defaultdict(float)
         self._public_command_time = {}
         self._word_wizards = {}  # user_id -> (chat_id, operation, expiry)
-        self._last_word_notice = {}  # chat_id -> monotonic time; prevent notice spam
+        # Rate-limit ALL public moderation reminders per group across modules.
+        self._last_moderation_notice = {}
 
     def send(self, chat_id, text, **kwargs):
         return self.api.safe("sendMessage", chat_id=chat_id, text=str(text)[:4000], **kwargs)
@@ -294,7 +304,7 @@ class GroupBot:
         conf = self.store.settings(chat_id)
         # The keyword page has its own compact button layout, matching the
         # reference bot, rather than an expanded rule list.
-        if what != "words":
+        if what not in ("words", "flood"):
             keyboard.extend(self._settings_controls(chat_id, what, conf))
         if what == "spam":
             text = (
@@ -310,14 +320,78 @@ class GroupBot:
             )
         elif what == "flood":
             text = (
-                "🚦 防刷屏策略（按每个群、每位成员独立统计）\n"
-                f"{conf['flood_window']} 秒内超过 {conf['flood_limit']} 条消息\n"
-                f"{conf['repeat_window']} 秒内重复 {conf['repeat_limit']} 次\n"
-                f"媒体连发：{'开启' if conf['media_flood_enabled'] else '关闭'}\n"
-                f"{conf['media_flood_window']} 秒内超过 "
-                f"{conf['media_flood_limit']} 个媒体消息\n"
-                "照片/视频/文件/语音/贴纸都可计入；编辑消息不增加次数。"
+                "💬 反刷屏\n\n"
+                f"状态：{'✅ 启用' if conf['anti_flood'] else '⭕ 关闭'}\n"
+                f"当前：{conf['flood_window']} 秒 / 超过 {conf['flood_limit']} 条\n"
+                f"重复：{conf['repeat_window']} 秒 / {conf['repeat_limit']} 次\n"
+                f"媒体连发：{'✅ 开启' if conf['media_flood_enabled'] else '关闭'}"
+                f"（{conf['media_flood_window']} 秒 / 超过 {conf['media_flood_limit']} 条）\n"
+                f"惩罚：{'单次仅删除触发消息' if conf['flood_penalty'] == 'delete' else '删除并禁言 ' + str(conf['flood_mute_minutes']) + ' 分钟'}\n"
+                f"删除提醒：{str(conf['flood_notice_seconds']) + ' 秒后撤回' if conf['flood_notice_seconds'] else '关闭（静默）'}"
             )
+            if conf["auto_mute_enabled"] and conf["flood_penalty"] == "delete":
+                text += "\n注：全局「累计违规禁言」已启用，累计达到阈值仍可能被禁言。"
+            keyboard.extend([
+                [self._button("✅ 启用", f"fs:{chat_id}:on"),
+                 self._button("⭕ 关闭", f"fs:{chat_id}:off")],
+                [self._button("💭 触发条数", f"v:{chat_id}:floodcount"),
+                 self._button("⏱️ 检测间隔", f"v:{chat_id}:floodinterval")],
+                [self._button("🔁 重复判断", f"v:{chat_id}:floodrepeat"),
+                 self._button("🖼️ 媒体连发", f"v:{chat_id}:floodmedia")],
+                [self._button("⚖️ 惩罚", f"v:{chat_id}:floodpenalty"),
+                 self._button("🕒 删除提醒", f"v:{chat_id}:floodnotice")],
+            ])
+        elif what in ("floodcount", "floodinterval", "floodrepeat", "floodmedia"):
+            labels = {
+                "floodcount": "💭 触发条数",
+                "floodinterval": "⏱️ 检测间隔",
+                "floodrepeat": "🔁 重复消息判断",
+                "floodmedia": "🖼️ 媒体连发限制",
+            }
+            current = (
+                f"短时消息：{conf['flood_window']} 秒内超过 {conf['flood_limit']} 条"
+                if what in ("floodcount", "floodinterval")
+                else f"重复消息：{conf['repeat_window']} 秒内达到 {conf['repeat_limit']} 次"
+                if what == "floodrepeat"
+                else f"媒体连发：{'开' if conf['media_flood_enabled'] else '关'}，"
+                     f"{conf['media_flood_window']} 秒内超过 {conf['media_flood_limit']} 条"
+            )
+            text = (f"{labels[what]}\n\n{current}\n\n"
+                    "点击下方 ➖ / ➕ 调整，仅对当前群生效。"
+                    + ("\n需同时开启主防刷屏开关才生效。"
+                       if what == "floodmedia" else ""))
+            keyboard.append([self._button("⬅️ 返回防刷屏", f"v:{chat_id}:flood")])
+        elif what == "floodpenalty":
+            text = (
+                "⚖️ 反刷屏惩罚\n\n"
+                f"当前：{'仅删除触发消息' if conf['flood_penalty'] == 'delete' else '删除消息并临时禁言'}\n"
+                f"禁言时长：{conf['flood_mute_minutes']} 分钟\n"
+                "默认只删触发违规的消息；不回溯删除正常消息。\n"
+                "临时禁言仅限超级群，需要机器人拥有删除消息和限制成员权限。\n"
+                "与全局累计违规禁言不会在同一次违规中重复禁言。"
+            )
+            if conf["auto_mute_enabled"] and conf["flood_penalty"] == "delete":
+                text += "\n⚠️ 全局累计违规禁言已开启，「单次仅删除」不代表永久免于累计处罚。"
+            keyboard.extend([
+                [self._button("✅ 仅删除", f"fp:{chat_id}:delete"),
+                 self._button("🔇 删除并禁言", f"fp:{chat_id}:mute")],
+                [self._button("⬅️ 返回防刷屏", f"v:{chat_id}:flood")],
+            ])
+        elif what == "floodnotice":
+            text = (
+                "🕒 反刷屏删除提醒\n\n"
+                f"当前：{'关闭（静默）' if conf['flood_notice_seconds'] == 0 else str(conf['flood_notice_seconds']) + ' 秒后撤回'}\n"
+                "只有成功删除刷屏消息才发送一条简短提醒，"
+                "不包含成员身份。\n"
+                "默认关闭；每群最多约30秒一次，设定时间后尽量撤回。"
+            )
+            keyboard.extend([
+                [self._button("🔕 关闭", f"fn:{chat_id}:0"),
+                 self._button("10 秒", f"fn:{chat_id}:10")],
+                [self._button("30 秒", f"fn:{chat_id}:30"),
+                 self._button("60 秒", f"fn:{chat_id}:60")],
+                [self._button("⬅️ 返回防刷屏", f"v:{chat_id}:flood")],
+            ])
         elif what == "links":
             text = (
                 "🔗 链接防护\n"
@@ -795,6 +869,7 @@ class GroupBot:
         parts = data.split(":")
         if len(parts) not in (2, 3, 4, 5) or parts[0] not in (
             "g", "t", "v", "n", "w", "wl", "ws", "wp", "wn",
+            "fs", "fp", "fn",
             "s", "sd", "sp", "sx"):
             self.answer(qid, "未知或失效的按钮")
             return
@@ -808,6 +883,58 @@ class GroupBot:
             return
         if parts[0] != "w":
             self._word_wizards.pop(user_id, None)
+        if parts[0] in ("fs", "fp", "fn"):
+            if len(parts) != 3:
+                return self.answer(qid, "防刷屏按钮参数无效", alert=True)
+            operation, setting = parts[0], parts[2]
+            conf = self.store.settings(chat_id)
+            if operation == "fs":
+                if setting not in ("on", "off"):
+                    return self.answer(qid, "防刷屏状态参数无效", alert=True)
+                on = setting == "on"
+                if conf["anti_flood"] == on:
+                    return self.answer(qid, "当前已经是此状态")
+                if (on and not conf["anti_flood"]
+                        and not self.bot_can(chat_id, "can_delete_messages")):
+                    return self.answer(qid, "机器人缺少删除消息的权限", alert=True)
+                self.store.set(chat_id, "anti_flood", on)
+                description = f"防刷屏：{'启用' if on else '关闭'}"
+                page = "flood"
+            elif operation == "fp":
+                if setting not in ("delete", "mute"):
+                    return self.answer(qid, "无效的防刷屏处罚方式", alert=True)
+                if conf["flood_penalty"] == setting:
+                    return self.answer(qid, "当前已经是此处罚方式")
+                if setting == "mute":
+                    if not self.is_supergroup(chat_id):
+                        return self.answer(qid, "禁言仅支持超级群组", alert=True)
+                    if (not self.bot_can(chat_id, "can_delete_messages")
+                            or not self.bot_can(chat_id, "can_restrict_members")):
+                        return self.answer(
+                            qid, "需要删除消息与限制成员两项权限", alert=True)
+                self.store.set(chat_id, "flood_penalty", setting)
+                description = ("防刷屏处罚：仅删除" if setting == "delete"
+                               else "防刷屏处罚：删除并临时禁言")
+                page = "floodpenalty"
+            else:
+                try:
+                    seconds = int(setting)
+                except ValueError:
+                    return self.answer(qid, "无效的提醒时间", alert=True)
+                if seconds not in (0, 10, 30, 60):
+                    return self.answer(qid, "提醒时间只能选关闭/10/30/60秒", alert=True)
+                if conf["flood_notice_seconds"] == seconds:
+                    return self.answer(qid, "当前已经是此提醒设置")
+                if seconds and not self.bot_can(chat_id, "can_delete_messages"):
+                    return self.answer(qid, "机器人缺少删除消息权限", alert=True)
+                self.store.set(chat_id, "flood_notice_seconds", seconds)
+                description = ("防刷屏提醒：关闭" if seconds == 0
+                               else f"防刷屏提醒：约 {seconds} 秒")
+                page = "floodnotice"
+            self.answer(qid, "✅ " + description)
+            self.log(chat_id, description, actor=user_id)
+            return self._private_view(
+                user_id, chat_id, page, message.get("message_id"))
         if parts[0] in ("wl", "ws", "wp", "wn"):
             if len(parts) != 3:
                 return self.answer(qid, "违禁词按钮参数无效", alert=True)
@@ -1116,6 +1243,25 @@ class GroupBot:
             if self.api.safe("deleteMessage", chat_id=cid, message_id=mid) is True:
                 self.store.clear_notice_deletion(cid, mid)
 
+    def _post_moderation_notice(self, chat_id, reason, seconds):
+        """Best-effort expiring notice, throttled across keyword/flood policies."""
+        if seconds not in (10, 30, 60) or reason not in ("违禁词", "防刷屏"):
+            return
+        tick = time.monotonic()
+        if tick - self._last_moderation_notice.get(chat_id, -1e10) < 30:
+            return
+        notice = self.send(
+            chat_id, f"⛔ {reason}违规消息已清理（本提醒约 {seconds} 秒后撤回）",
+            disable_notification=True)
+        if isinstance(notice, dict) and notice.get("message_id"):
+            self._last_moderation_notice[chat_id] = tick
+            self.store.schedule_notice_deletion(
+                chat_id, notice["message_id"], int(time.time()) + seconds)
+        if len(self._last_moderation_notice) > 5000:
+            self._last_moderation_notice = {
+                cid: last for cid, last in self._last_moderation_notice.items()
+                if tick - last < 3600}
+
     def _moderate(self, message, *, is_edit=False):
         chat = message["chat"]
         chat_id = chat["id"]
@@ -1160,41 +1306,38 @@ class GroupBot:
             if deleted is True:
                 self.store.stat(chat_id, "deleted")
                 self.log(chat_id, f"自动删除（{reason}）", target=user_id)
-                keyword_muted = False
-                if (reason == "违禁词" and not is_edit
-                        and settings["word_penalty"] == "mute"
+                flood_reason = reason in FLOOD_REASONS
+                keyword_reason = reason == "违禁词"
+                specific_minutes = (
+                    settings["word_mute_minutes"]
+                    if keyword_reason and settings["word_penalty"] == "mute"
+                    else settings["flood_mute_minutes"]
+                    if flood_reason and settings["flood_penalty"] == "mute"
+                    else None)
+                specific_muted = False
+                if (specific_minutes is not None and not is_edit
                         and fresh.get("status") in ("member", "restricted")
                         and self.is_supergroup(chat_id)
                         and self.bot_can(chat_id, "can_restrict_members")
                         and self.can_target(chat_id, user_id)):
-                    keyword_muted = self.api.safe(
+                    specific_muted = self.api.safe(
                         "restrictChatMember", chat_id=chat_id, user_id=user_id,
                         permissions=RESTRICTED,
-                        until_date=int(time.time())
-                        + settings["word_mute_minutes"] * 60) is True
-                    if keyword_muted:
+                        until_date=int(time.time()) + specific_minutes * 60) is True
+                    if specific_muted:
                         self.store.stat(chat_id, "actions")
                         self.log(chat_id,
-                                 f"违禁词违规，禁言 {settings['word_mute_minutes']} 分钟",
+                                 f"{'违禁词' if keyword_reason else '防刷屏'}违规，"
+                                 f"禁言 {specific_minutes} 分钟",
                                  target=user_id)
-                if reason == "违禁词" and settings["word_notice_seconds"] > 0:
-                    tick = time.monotonic()
-                    if tick - self._last_word_notice.get(chat_id, -1e10) >= 30:
-                        seconds = settings["word_notice_seconds"]
-                        reminder = self.send(
-                            chat_id, f"⛔ 违规消息已清理（本提醒约 {seconds} 秒后撤回）",
-                            disable_notification=True)
-                        if isinstance(reminder, dict) and reminder.get("message_id"):
-                            self._last_word_notice[chat_id] = tick
-                            self.store.schedule_notice_deletion(
-                                chat_id, reminder["message_id"],
-                                int(time.time()) + seconds)
-                        if len(self._last_word_notice) > 5000:
-                            self._last_word_notice = {
-                                cid: last for cid, last in self._last_word_notice.items()
-                                if tick - last < 3600}
+                if keyword_reason:
+                    self._post_moderation_notice(
+                        chat_id, "违禁词", settings["word_notice_seconds"])
+                elif flood_reason:
+                    self._post_moderation_notice(
+                        chat_id, "防刷屏", settings["flood_notice_seconds"])
                 if (settings["auto_mute_enabled"] and not is_edit
-                        and not keyword_muted):
+                        and not specific_muted):
                     history = self.store.record_moderation(
                         chat_id, user_id, message["message_id"], reason)
                     threshold = settings["auto_mute_after"]

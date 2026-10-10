@@ -212,14 +212,17 @@ class GuardPanelTests(unittest.TestCase):
         self.bot.handle_update(self.cb(1, "v:-1001:flood"))
         keys = self.edited()["reply_markup"]["inline_keyboard"]
         cmds = [b["callback_data"] for row in keys for b in row]
-        self.assertIn("t:-1001:media_flood_enabled:flood", cmds)
-        self.assertIn("n:-1001:flood_limit:+1:flood", cmds)
-        self.bot.handle_update(self.cb(1, "t:-1001:media_flood_enabled:flood"))
+        self.assertIn("v:-1001:floodmedia", cmds)
+        self.assertIn("v:-1001:floodcount", cmds)
+        self.assertNotIn("n:-1001:flood_limit:+1:flood", cmds)
+        self.bot.handle_update(self.cb(1, "v:-1001:floodmedia"))
+        self.bot.handle_update(self.cb(1, "t:-1001:media_flood_enabled:floodmedia"))
         self.assertTrue(self.store.settings(-1001)["media_flood_enabled"])
         self.assertIn("媒体连发", self.edited()["text"])
-        self.bot.handle_update(self.cb(1, "n:-1001:flood_limit:+1:flood"))
+        self.bot.handle_update(self.cb(1, "v:-1001:floodcount"))
+        self.bot.handle_update(self.cb(1, "n:-1001:flood_limit:+1:floodcount"))
         self.assertEqual(self.store.settings(-1001)["flood_limit"], 8)
-        self.bot.handle_update(self.cb(1, "n:-1001:flood_limit:-1:flood"))
+        self.bot.handle_update(self.cb(1, "n:-1001:flood_limit:-1:floodcount"))
         self.assertEqual(self.store.settings(-1001)["flood_limit"], 7)
 
     def test_tampered_numeric_button_or_group_member_is_denied(self):

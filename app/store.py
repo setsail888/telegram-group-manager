@@ -33,6 +33,9 @@ DEFAULTS = {
     "flood_window": 10,
     "repeat_limit": 3,
     "repeat_window": 45,
+    "flood_penalty": "delete",
+    "flood_mute_minutes": 10,
+    "flood_notice_seconds": 0,
     "media_flood_limit": 5,
     "media_flood_window": 20,
     "media_flood_enabled": False,
@@ -64,6 +67,7 @@ NUMBER_LIMITS = {
     "auto_mute_minutes": (1, 1440),
     "name_length_limit": (20, 100),
     "word_mute_minutes": (5, 1440),
+    "flood_mute_minutes": (5, 1440),
 }
 
 
@@ -298,9 +302,14 @@ class Store:
             raise ValueError("OCR 信心阈值范围为 40–95")
         if name == "word_penalty" and value not in ("delete", "mute"):
             raise ValueError("违禁词处罚只能为 delete 或 mute")
+        if name == "flood_penalty" and value not in ("delete", "mute"):
+            raise ValueError("防刷屏处罚只能为 delete 或 mute")
         if name == "word_notice_seconds" and (
             type(value) is not int or value not in (0, 10, 30, 60)):
             raise ValueError("违禁词删除提醒只能为 0、10、30、60 秒")
+        if name == "flood_notice_seconds" and (
+            type(value) is not int or value not in (0, 10, 30, 60)):
+            raise ValueError("防刷屏删除提醒只能为 0、10、30、60 秒")
         if name in NUMBER_LIMITS:
             lo, hi = NUMBER_LIMITS[name]
             if type(value) is not int or not lo <= value <= hi:
