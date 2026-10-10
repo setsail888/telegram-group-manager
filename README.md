@@ -14,6 +14,8 @@ bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/slobys/telegra
 
 安装目录默认 `~/groupguard`，备份默认 `~/groupguard-backups`。普通版建议至少 1 vCPU、512 MB 可用内存、1 GB 可用磁盘空间。NAS、手动部署和故障处理见 [服务器部署指南](docs/server-one-click.md)。
 
+旧版若在容器显示 `Running` 后反复从头安装，按 [重复安装恢复步骤](docs/server-one-click.md#容器已-running却反复进入安装) 更新源码并补齐快捷命令。
+
 ## 打开菜单与更新
 
 安装成功后，在任意目录输入以下命令打开中文菜单；`GG` 同样可用：

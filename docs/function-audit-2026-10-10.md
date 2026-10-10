@@ -173,3 +173,13 @@
 `tests/test_server_install.py`从29项扩展至39项，覆盖精简菜单、更新成功重新加载/失败保留入口、gg/GG跨目录及参数透传、路径空格/重复注册、同名文件/符号链接保护、在线旧版升级、新旧安装入口、缺少Git、缺少curl和下载失败。更新前备份、源码冲突、数据库失败、Token隐藏和既有Docker保护测试继续通过。WSL Python 3.12完整 **420项通过**，编译、三个Bash脚本语法和文档链接/锚点检查通过。测试使用隔离目录与命令替身，没有实际安装Docker、修改系统快捷命令或连接生产服务器。
 
 主要修改`install.sh`、`scripts/server-bootstrap.sh`、`scripts/server-manager.sh`、`tests/test_server_install.py`、README、服务器/按钮指南和本报告；新增`docs/commands.md`。本轮未修改机器人运行时业务代码或增加Python依赖。
+
+## 第八轮：修复 root 安装递归（2026-10-10）
+
+- **现场证据与原因**：用户安装日志中“一键安装 / 修复安装”出现86次，构建启动出现85次，没有一次到达快捷命令注册成功提示。第七轮新增注册入口时，root 分支直接执行 `"$@"`，使 `root install` 优先调用同名机器人安装函数；普通用户的 `sudo install` 则调用系统程序，因此原有普通用户测试未发现问题。
+- **修复**：`scripts/server-manager.sh` 的 root 分支改用 `command "$@"`，绕过同名 shell 函数。安装正常结束，`shortcuts` 可单独补齐入口，无需重建容器或重新配置 Token。README及服务器指南补充停止循环、快进更新源码、修复快捷命令和检查日志的恢复步骤。
+- **回归覆盖**：新增3项测试，在隔离脚本中仅替换身份判断，分别运行原本的 root/sudo 执行分支，使普通CI账号也覆盖root场景；验证外部命令调用和空格参数、仅构建一次、gg/GG生成与跨目录调用、Token及.env保留，以及无需Docker/Token的重复快捷命令修复。先确认旧实现的 root 分支失败，再验证修复通过。
+
+本轮WSL Python 3.12完整 **423项通过**（含42项安装测试），另以WSL真实root账号运行全部 **42项安装测试通过**；后者重复安装用例，不另计为独立用例数。应用/测试编译、三个Bash脚本语法、恢复文档链接/命令及diff空白检查通过。测试均使用临时目录和Docker/Git替身，没有安装Docker、改写系统快捷命令或连接生产服务器；实际服务器仍须拉取本轮修复并查看机器人日志。
+
+本轮修改 `scripts/server-manager.sh`、`tests/test_server_install.py`、README、服务器指南和本报告，没有修改业务数据结构或增加依赖。

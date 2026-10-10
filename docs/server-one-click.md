@@ -188,6 +188,23 @@ gg backup
 
 ## 十、故障检查
 
+### 容器已 Running，却反复进入安装
+
+如果日志反复出现“一键安装 / 修复安装”，每次 Docker 构建完成、容器显示 `Running` 后又从头开始，这是旧版快捷命令注册的脚本缺陷：root 账号调用系统 `install` 命令时，误进入同名的机器人安装函数，导致递归安装。修复版已改为明确调用外部命令。
+
+先按 **Ctrl+C** 停止循环，然后在服务器 SSH 中执行：
+
+~~~bash
+cd ~/groupguard &&
+git pull --ff-only origin main &&
+bash scripts/server-manager.sh shortcuts &&
+gg status
+~~~
+
+自定义安装目录请替换第一行路径。这一步更新源码、补齐 `gg/GG` 并查看状态，不重建容器，不改写 `.env` 或数据库；不需要重新输入 Token。若 Git 提示本地改动或无法快进，先处理该错误，不要继续运行旧安装器或强制覆盖源码。
+
+容器 `Running` 只表示容器正在运行；再执行 `gg logs`，确认机器人正常连接 Telegram。
+
 ### Docker 安装失败及重复提示
 
 旧版菜单如果反复显示“未发现 Docker，准备按照 Docker 官方 apt 软件源进行安装”，说明 Docker 没有安装成功。旧版使用的 apt-get -qq 不会显示正常安装进度，而且菜单对失败的处理不够明确。**先按 Ctrl+C 停止，升级修复后的脚本再运行**：
@@ -221,6 +238,7 @@ curl -I --connect-timeout 10 --max-time 20 https://download.docker.com/
 | 症状 | 可能原因与排查 |
 |---|---|
 | GitHub 下载失败 | 检查公开仓库 URL、DNS、HTTPS 出站连接，以及服务器能否访问 github.com 与 raw.githubusercontent.com |
+| 容器 Running 后又从头安装 | 旧版 root 快捷命令注册递归；按上方“容器已 Running，却反复进入安装”步骤更新源码并修复快捷命令 |
 | Docker 反复显示安装开始 | 旧脚本未中止 apt 错误；按 Ctrl+C 退出，按上面命令拉取修复版并查看具体失败步骤 |
 | Token 验证失败 | Token 格式不对；重新运行菜单 5 输入，输入时内容不会显示 |
 | Docker 构建失败 | 服务器无法访问 Docker Hub、磁盘空间不足或 Docker 官方 apt 仓库暂不可用 |

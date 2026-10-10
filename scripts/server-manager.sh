@@ -23,7 +23,9 @@ die() { printf '\n\033[1;31m[错误]\033[0m %s\n' "$*" >&2; exit 1; }
 
 root() {
   if [[ "${EUID}" -eq 0 ]]; then
-    "$@"
+    # Match sudo's external-command lookup. A plain "$@" resolves `install`
+    # to our deployment function, recursively rebuilding during gg setup.
+    command "$@"
   else
     command -v sudo >/dev/null 2>&1 || die "此操作需要 sudo，请先为当前 SSH 用户配置 sudo"
     sudo "$@"

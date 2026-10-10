@@ -107,6 +107,84 @@ exit 99
             'env_put OCR_ENABLED 0\n')
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def select_privilege_branch(self, *, root_user):
+        # Force only the identity check in the isolated script, so ordinary
+        # CI users exercise the real root branch too. All commands stay mocked
+        # or write to this test's temporary directory; no sudo is required.
+        source = (PROJECT / "scripts/server-manager.sh").read_text()
+        condition = 'if [[ "${EUID}" -eq 0 ]]; then'
+        self.assertEqual(source.count(condition), 1)
+        source = source.replace(condition,
+                                "if true; then" if root_user else "if false; then")
+        (self.project / "scripts/server-manager.sh").write_text(source)
+        self.log.unlink(missing_ok=True)
+
+    def test_privileged_commands_bypass_same_named_shell_functions(self):
+        self.fake_bin("install", """#!/usr/bin/env bash
+set -eu
+printf 'external install' >> "$GROUPGUARD_MOCK_LOG"
+printf ' <%s>' "$@" >> "$GROUPGUARD_MOCK_LOG"
+printf '\\n' >> "$GROUPGUARD_MOCK_LOG"
+""")
+        for root_user in (True, False):
+            with self.subTest(root_user=root_user):
+                self.select_privilege_branch(root_user=root_user)
+                result = self.run_source("""
+install() { echo UNEXPECTED_INSTALL_FUNCTION >&2; return 73; }
+root install -m 755 -- 'source with spaces' 'destination with spaces'
+""")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("UNEXPECTED_INSTALL_FUNCTION", result.stderr)
+                calls = self.log.read_text()
+                self.assertIn("external install <-m> <755> <--> "
+                              "<source with spaces> <destination with spaces>", calls)
+                self.assertEqual("sudo install" in calls, not root_user)
+
+    def test_install_finishes_once_for_root_and_sudo_users(self):
+        self.provision_env()
+        original_env = (self.project / ".env").read_bytes()
+        for root_user in (True, False):
+            with self.subTest(root_user=root_user):
+                self.select_privilege_branch(root_user=root_user)
+                launchers = self.base / f"launchers {root_user}" / "bin"
+                self.env["GROUPGUARD_BIN_DIR"] = str(launchers)
+                result = self.run_manager("install")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.count("一键安装 / 修复安装"), 1)
+                self.assertEqual(result.stdout.count("已设置快捷命令"), 1)
+                self.assertIn("部署命令完成", result.stdout)
+                self.assertEqual((self.project / ".env").read_bytes(), original_env)
+                self.assertNotIn(self.token, result.stdout + result.stderr)
+                calls = self.log.read_text().splitlines()
+                self.assertEqual(calls.count("docker compose up -d --build groupbot"), 1)
+                for name in ("gg", "GG"):
+                    launcher = launchers / name
+                    self.assertEqual(launcher.stat().st_mode & 0o777, 0o755)
+                    status = subprocess.run([str(launcher), "status"],
+                        cwd=self.base / "home", env=self.env, text=True,
+                        capture_output=True, timeout=10)
+                    self.assertEqual(status.returncode, 0, status.stderr)
+                    self.assertIn("服务状态", status.stdout)
+
+    def test_shortcuts_repair_without_install_or_docker_for_both_users(self):
+        for root_user in (True, False):
+            with self.subTest(root_user=root_user):
+                self.select_privilege_branch(root_user=root_user)
+                launchers = self.base / f"repair {root_user}" / "bin"
+                self.env["GROUPGUARD_BIN_DIR"] = str(launchers)
+                for _ in range(2):
+                    result = self.run_manager("shortcuts")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("已设置快捷命令", result.stdout)
+                    self.assertNotIn("一键安装 / 修复安装", result.stdout)
+                self.assertFalse((self.project / ".env").exists())
+                self.assertNotIn("docker", self.log.read_text() if self.log.exists() else "")
+                result = subprocess.run([str(launchers / "GG"), "help"],
+                    cwd=self.base / "home", env=self.env, text=True,
+                    capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(str(self.project / "scripts/server-manager.sh"), result.stdout)
+
     def test_help_does_not_mutate_system(self):
         result = self.run_manager("help")
         self.assertEqual(result.returncode, 0, result.stderr)
