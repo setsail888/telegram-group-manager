@@ -247,6 +247,32 @@ check_config() {
   dc config -q || die "Docker Compose 配置检查失败"
 }
 
+install_shortcuts() (
+  local launcher_dir="${GROUPGUARD_BIN_DIR:-/usr/local/bin}" name launcher
+  [[ "${launcher_dir}" == /* ]] || die "快捷命令目录必须是绝对路径"
+  for name in gg GG; do
+    if [[ -e "${launcher_dir}/${name}" || -L "${launcher_dir}/${name}" ]]; then
+      [[ -f "${launcher_dir}/${name}" && ! -L "${launcher_dir}/${name}" ]] &&
+        grep -Fxq '# GroupGuard managed launcher' "${launcher_dir}/${name}" ||
+        die "${launcher_dir}/${name} 已存在且不是本项目快捷命令，不会覆盖"
+    fi
+  done
+  launcher="$(mktemp "${TMPDIR:-/tmp}/groupguard-launcher.XXXXXXXX")" ||
+    die "无法创建快捷命令临时文件"
+  trap 'rm -f -- "$launcher"' EXIT
+  {
+    printf '#!/usr/bin/env bash\n# GroupGuard managed launcher\n'
+    printf 'exec bash %q "$@"\n' "${APP_DIR}/scripts/server-manager.sh"
+  } > "${launcher}"
+  [[ -d "${launcher_dir}" ]] || root install -d -m 755 -- "${launcher_dir}" ||
+    die "无法创建快捷命令目录"
+  for name in gg GG; do
+    root install -m 755 -- "${launcher}" "${launcher_dir}/${name}" ||
+      die "无法写入快捷命令 ${launcher_dir}/${name}"
+  done
+  info "已设置快捷命令：gg 或 GG 打开菜单，gg update 更新机器人（无需重新登录）"
+)
+
 show_status() {
   info "服务状态："
   dc --profile dashboard ps || :
@@ -314,6 +340,7 @@ install() {
   check_config
   info "开始构建并启动中文 Telegram 管理机器人"
   dc up -d --build groupbot
+  install_shortcuts || warn "部署已完成，但快捷命令未安装；可运行 bash \"${APP_DIR}/scripts/server-manager.sh\" shortcuts 重试"
   info "部署命令完成，以下是当前容器状态："
   dc ps
   info "接下来：私聊 @BotFather 创建并配置机器人，加入测试群设为管理员，发送 /check 和 /panel"
@@ -340,6 +367,10 @@ update() {
     die "更新失败；请检查公开 GitHub 仓库的网络连接和本地源码状态"
   dc config -q
   dc up -d --build groupbot
+  # Load the newly pulled script, rather than the function definitions that
+  # were already parsed before Git updated this file.
+  bash "${APP_DIR}/scripts/server-manager.sh" shortcuts ||
+    warn "机器人已更新，但快捷命令未安装；可运行管理脚本 shortcuts 重试"
   info "更新成功，当前 Git 提交：$(git -C "${APP_DIR}" rev-parse --short HEAD)"
   dc ps
 }
@@ -434,6 +465,10 @@ help_menu() {
 
 GroupGuard 服务器一键管理
 
+  gg / GG                                               中文交互菜单
+  gg update                                             先备份再更新 main 并重建容器
+  gg shortcuts                                          安装 / 修复 gg 和 GG 快捷命令
+
   bash "${APP_DIR}/scripts/server-manager.sh"               中文交互菜单
   bash "${APP_DIR}/scripts/server-manager.sh" install       安装或修复部署
   bash "${APP_DIR}/scripts/server-manager.sh" update        先备份再从 GitHub 更新
@@ -457,15 +492,12 @@ menu() {
     printf '%s\n' '  🛡️  GroupGuard 群卫士｜云服务器一键管理'
     printf '%s\n' '======================================================'
     printf '%s\n' '  1. 安装 / 修复部署'
-    printf '%s\n' '  2. 从 GitHub 更新（自动备份数据库）'
+    printf '%s\n' '  2. 更新机器人（gg update，先备份再更新 main）'
     printf '%s\n' '  3. 查看运行状态'
     printf '%s\n' '  4. 查看最近日志'
     printf '%s\n' '  5. 修改 BotFather Token'
-    printf '%s\n' '  6. OCR 图片识别开关'
-    printf '%s\n' '  7. 只读网页看板'
-    printf '%s\n' '  8. 备份数据'
-    printf '%s\n' '  9. 启动 / 停止 / 重启服务'
-    printf '%s\n' ' 10. 卸载（默认保留积分和群配置）'
+    printf '%s\n' '  6. 启动 / 停止 / 重启服务'
+    printf '%s\n' '  7. 卸载（默认保留积分和群配置）'
     printf '%s\n' '  0. 退出'
     printf '%s\n' '======================================================'
     tty_line '请输入序号： ' || break
@@ -473,16 +505,18 @@ menu() {
       # New Bash process: (install) || warn disables errexit inside install.
       1) bash "${APP_DIR}/scripts/server-manager.sh" install ||
            warn "安装未成功，请查看上方红色错误和 apt/curl 输出，排查原因后再重试" ;;
-      2) bash "${APP_DIR}/scripts/server-manager.sh" update ||
-           warn "更新未成功，保留原有数据；请查看上方具体错误后再重试" ;;
+      2)
+        if bash "${APP_DIR}/scripts/server-manager.sh" update; then
+          exec bash "${APP_DIR}/scripts/server-manager.sh" menu
+        else
+          warn "更新未成功，保留原有数据；请查看上方具体错误后再重试"
+        fi
+        ;;
       3) (show_status) || : ;;
       4) (show_logs) || : ;;
       5) (configure_action) || : ;;
-      6) (ocr_menu) || : ;;
-      7) (dashboard_menu) || : ;;
-      8) (backup) || warn "未能完成备份" ;;
-      9) (stop_start_menu) || : ;;
-      10) (uninstall_menu) || : ;;
+      6) (stop_start_menu) || : ;;
+      7) (uninstall_menu) || : ;;
       0) return ;;
       *) warn "请输入菜单中的有效序号" ;;
     esac
@@ -493,6 +527,7 @@ menu() {
 case "${1:-menu}" in
   install) install ;;
   update) update ;;
+  shortcuts) install_shortcuts ;;
   configure) configure_action ;;
   status) show_status ;;
   logs) show_logs ;;

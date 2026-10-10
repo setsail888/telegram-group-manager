@@ -32,17 +32,20 @@ ssh ubuntu@你的服务器IP
 ## 三、一键安装：复制一条命令
 
 ~~~bash
-bash -c 'set -euo pipefail; command -v curl >/dev/null 2>&1 || { if [ "$(id -u)" -eq 0 ]; then apt-get update && apt-get install -y curl ca-certificates; else sudo apt-get update && sudo apt-get install -y curl ca-certificates; fi; }; curl -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh | bash'
+bash -o pipefail -c 'curl -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager/main/install.sh | bash'
 ~~~
+
+这条命令也适用于旧版升级：已有安装会先备份并更新 main，再注册 `gg` / `GG`。如果系统提示 `curl: command not found`，root 账号先运行 `apt-get update && apt-get install -y curl ca-certificates`；普通账号在两条 apt-get 命令前加 `sudo`，然后重试安装命令。
 
 安装器依次完成：
 
-1. 如果缺少 curl，会自动通过 apt 安装 curl 和证书；启动脚本还会检测并安装缺失的 Git。
+1. 检测并安装缺失的 Git；下载入口需要服务器已有 curl。
 2. 直接从公开 GitHub 仓库下载启动脚本，无需 GitHub 登录或授权码。
 3. 使用 git clone 克隆项目到当前 SSH 用户的 **~/groupguard**（已有同名安装时检查远程地址，不会覆盖其他项目）。
 4. 若没有 Docker，先下载 Docker 官方快捷安装脚本 https://get.docker.com 到临时文件，再用 sudo/root 执行，随后核验 Engine 和 Compose V2；若已有 Docker 则**跳过重新安装 Engine**，缺少 Compose V2 时只尝试补装插件，不卸载已有容器或软件。
 5. 首次生成权限为 600 的 ~/groupguard/.env，隐藏输入 BotFather Token 并检查格式。
 6. 校验 Compose 配置，构建容器，启动 groupbot 并显示运行状态。
+7. 在 `/usr/local/bin` 注册 `gg` 和 `GG`，以后无需输入安装目录；若同名文件属于其他程序则不会覆盖，会提示完整路径入口。可通过 `GROUPGUARD_BIN_DIR` 指定其他绝对路径目录，但须自行确保该目录在 PATH 中。
 
 默认是**轻量普通版**：不会安装 OCR、不启动网页看板，也不会自动改防火墙和其他 Docker 服务。
 
@@ -51,7 +54,7 @@ bash -c 'set -euo pipefail; command -v curl >/dev/null 2>&1 || { if [ "$(id -u)"
 不需要 GitHub 授权。确认服务器能够访问 GitHub 和公开安装脚本：
 
 ~~~bash
-curl -I https://raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh
+curl -I https://raw.githubusercontent.com/slobys/telegram-group-manager/main/install.sh
 git ls-remote https://github.com/slobys/telegram-group-manager.git HEAD
 ~~~
 
@@ -66,6 +69,8 @@ bash install.sh
 ~~~
 
 这与一键安装入口调用的是同一管理器。
+
+已有 NAS 或其他路径的源码，直接在项目目录运行 `bash install.sh`，沿用该目录做修复安装，不另行克隆。项目中的 `install.sh` 保留本地修复行为；在线命令用于新安装或备份后更新。自定义旧安装目录时，可先 `export GROUPGUARD_DIR=/实际安装目录` 再运行在线命令。
 
 ## 四、BotFather 设置
 
@@ -92,26 +97,40 @@ bash install.sh
 在服务器 SSH 中执行：
 
 ~~~bash
-bash ~/groupguard/scripts/server-manager.sh
+gg
 ~~~
 
-菜单包含安装/修复、GitHub 更新（先备份）、查看状态、日志、修改 Bot Token、本地 OCR、网页看板、备份、启动/停止/重启和卸载。
+`GG` 与 `gg` 相同，无需重新登录。在任意目录都可打开菜单：
+
+| 序号 | 操作 |
+| --- | --- |
+| 1 | 安装 / 修复部署 |
+| 2 | 更新机器人：先备份、更新 main，再构建启动；成功后重新加载最新菜单 |
+| 3 | 查看运行状态 |
+| 4 | 查看最近日志 |
+| 5 | 修改 BotFather Token |
+| 6 | 启动 / 停止 / 重启服务 |
+| 7 | 卸载，默认保留数据 |
+| 0 | 退出 |
+
+OCR、只读网页看板、手动备份从主菜单移除，命令入口保留；更新前仍自动备份。第2项和 `gg update` 均执行 `bash 安装目录/scripts/server-manager.sh update`，不会仅重启旧容器。
 
 也支持直接运行：
 
 ~~~bash
-bash ~/groupguard/scripts/server-manager.sh status
-bash ~/groupguard/scripts/server-manager.sh logs
-bash ~/groupguard/scripts/server-manager.sh logs-follow
-bash ~/groupguard/scripts/server-manager.sh backup
-bash ~/groupguard/scripts/server-manager.sh update
+gg status
+gg logs
+gg logs-follow
+gg update
 ~~~
 
 持续日志模式按 Ctrl+C 退出。
 
+旧版还没有快捷命令时，重新执行第三节的在线安装命令，可备份升级并补齐入口。若已更新源码，只需运行 `bash ~/groupguard/scripts/server-manager.sh shortcuts`；快捷命令安装失败时，完整路径 `bash ~/groupguard/scripts/server-manager.sh` 仍可使用。
+
 ## 六、网页管理面板（可选）
 
-菜单输入 **7 → 1**，第一次会为看板生成一枚独立随机密钥，仅显示一次。建议保存到密码管理器，不要当成 BotFather Token。
+执行 `gg dashboard` 后选择 **1**，第一次会为看板生成一枚独立随机密钥，仅显示一次。建议保存到密码管理器，不要当成 BotFather Token。
 
 看板只绑定服务器 **127.0.0.1:8765**，没有对公网开放。用 Windows PowerShell 建立 SSH 隧道：
 
@@ -123,7 +142,7 @@ ssh -N -L 8765:127.0.0.1:8765 ubuntu@你的服务器IP
 
 ## 七、图片 OCR（可选）
 
-菜单输入 **6 → 1**，安装器会修改 WITH_OCR=1 和 OCR_ENABLED=1，并构建 Tesseract 中文 OCR 镜像。普通版和 OCR 版都不需要域名。
+执行 `gg ocr` 后选择 **1**，安装器会修改 WITH_OCR=1 和 OCR_ENABLED=1，并构建 Tesseract 中文 OCR 镜像。普通版和 OCR 版都不需要域名。
 
 先在 Telegram 中创建私人管理日志群，让机器人拥有发消息权限，并回到测试群执行：
 
@@ -134,7 +153,7 @@ ssh -N -L 8765:127.0.0.1:8765 ubuntu@你的服务器IP
 /ocrconfidence 80
 ~~~
 
-**review 只向日志群报告疑似命中，不会自动删除图片。** 尝试足够多真实图片、确认误判率后，才考虑 /ocr delete。随时可以 /ocr off，也可以通过菜单 **6 → 2** 恢复轻量版镜像。
+**review 只向日志群报告疑似命中，不会自动删除图片。** 尝试足够多真实图片、确认误判率后，才考虑 /ocr delete。随时可以 /ocr off，也可以执行 `gg ocr` 后选择 **2** 恢复轻量版镜像。
 
 注意：OCR 识别图片中部分文字，不识别二维码或广告意图；可能跳过大图片或队列拥塞的消息。
 
@@ -143,7 +162,7 @@ ssh -N -L 8765:127.0.0.1:8765 ubuntu@你的服务器IP
 在服务器执行：
 
 ~~~bash
-bash ~/groupguard/scripts/server-manager.sh update
+gg update
 ~~~
 
 安装器会先暂停机器人、将 SQLite 数据库导出到 **~/groupguard-backups**，成功后重新启动原容器，再以 fast-forward 方式拉取公开 GitHub 仓库 main 分支的最新代码，重新构建并启动。**更新同样无需 GitHub 登录。**
@@ -153,14 +172,14 @@ bash ~/groupguard/scripts/server-manager.sh update
 也可以单独执行：
 
 ~~~bash
-bash ~/groupguard/scripts/server-manager.sh backup
+gg backup
 ~~~
 
 > 如果系统级别的 Docker 或服务器磁盘出现故障，仅本机备份不够。重要数据库建议另行复制到 NAS 或其他安全位置。
 
 ## 九、卸载
 
-运行管理菜单，选择 **10**。
+运行 `gg` 管理菜单，选择 **7**。
 
 - 选择 **1**：删除 GroupGuard 容器，**保留** Docker 命名卷、源码、.env 和备份。
 - 选择 **2**：危险操作。必须再手动输入完整确认短语 DELETE GROUPGUARD DATA，才删除该项目 Docker 命名卷。
@@ -209,7 +228,8 @@ curl -I --connect-timeout 10 --max-time 20 https://download.docker.com/
 | 群广告未被删除 | 检查机器人管理员权限、Telegram privacy 设置，及群内 /links on |
 | 菜单不显示群 | 先邀请机器人加入测试群，发送 /panel，再私聊 /start |
 | 409 Conflict | 同一个 Bot Token 在其他进程中轮询；每个 Token 只启动一个 groupbot |
-| OCR 不生效 | 菜单 6 → 1、群日志 /setlog、/ocr review、关键词长度与语言包 |
+| OCR 不生效 | gg ocr → 1、群日志 /setlog、/ocr review、关键词长度与语言包 |
+| gg / GG 未找到 | 旧安装重新运行在线安装命令；已更新源码可运行管理脚本 shortcuts；检查 /usr/local/bin 是否在 PATH 中及同名命令冲突 |
 | 已有 Docker 但缺少 Compose | 为保护原有项目，安装器会停止；按 [Docker 官方文档](https://docs.docker.com/engine/install/) 补充 Compose V2 |
 
 ## 安全原则

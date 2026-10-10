@@ -162,3 +162,14 @@
 第六轮完整验证：WSL Python 3.12 **410项**（含29项模拟Linux安装测试）、Windows Python 3.13应用 **381项**；两组共享应用用例，不能相加。编译、三个部署脚本Bash语法及diff空白检查通过。尚未连接真实Bot Token、Telegram群或生产服务器，实际群权限、网络失败和部署仍待线上验收。
 
 主要新增 `app/cross_flood.py`、`app/flood_penalty.py`、`app/flood_ui.py`、`tests/test_cross_flood.py`；修改 `app/service.py`、`app/store.py`、`app/admin_ui.py`、`tests/test_flood_menu_v7.py` 和相关文档。使用步骤与Telegram接口边界见 [跨账号防刷屏与惩罚指南](cross-account-flood.md)。
+
+## 第七轮：服务器菜单与文档入口（2026-10-10）
+
+- **菜单精简**：移除主菜单的OCR、网页看板及手动备份入口，保留命令和更新前自动备份。其余选项连续编号为1–7，0退出。第2项仍调用管理脚本的update，执行备份、fast-forward拉取main和容器重建；修复更新成功后父进程仍显示旧菜单的问题，改为重新加载最新脚本。
+- **gg / GG**：安装和更新后在`/usr/local/bin`注册两个可执行入口，绑定安装目录，透传参数，任意目录可打开菜单，也支持`gg update`等命令；无需修改shell配置或重新登录。注册可重复执行，支持带空格的安装路径，不覆盖无关同名文件或符号链接。快捷入口失败会明确提示，完整路径命令仍可用。
+- **安装与兼容**：在线入口统一为根目录`install.sh`，README命令从350字符缩短至119字符，保留下载失败状态。新安装自动准备Git/Docker；下载入口需要curl，缺失时的安装方法移到指南。旧安装执行在线入口会先备份升级，再调用新脚本注册快捷命令；项目内`bash install.sh`继续执行本地修复。原server-bootstrap.sh公开URL保留兼容入口。
+- **文档整理**：README从498行精简为85行，保留安装、维护、Telegram初次使用、功能概览和导航；详细命令、积分、商城、抽奖、公告及自动回复迁到`docs/commands.md`，防护和安装细节链接现有专题指南。同步服务器指南和按钮指南，移除失效菜单编号及个人NAS路径。
+
+`tests/test_server_install.py`从29项扩展至39项，覆盖精简菜单、更新成功重新加载/失败保留入口、gg/GG跨目录及参数透传、路径空格/重复注册、同名文件/符号链接保护、在线旧版升级、新旧安装入口、缺少Git、缺少curl和下载失败。更新前备份、源码冲突、数据库失败、Token隐藏和既有Docker保护测试继续通过。WSL Python 3.12完整 **420项通过**，编译、三个Bash脚本语法和文档链接/锚点检查通过。测试使用隔离目录与命令替身，没有实际安装Docker、修改系统快捷命令或连接生产服务器。
+
+主要修改`install.sh`、`scripts/server-bootstrap.sh`、`scripts/server-manager.sh`、`tests/test_server_install.py`、README、服务器/按钮指南和本报告；新增`docs/commands.md`。本轮未修改机器人运行时业务代码或增加Python依赖。

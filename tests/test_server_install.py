@@ -22,6 +22,7 @@ class InstallerScriptTests(unittest.TestCase):
                      self.project / "scripts/server-manager.sh")
         shutil.copy2(PROJECT / "scripts/server-bootstrap.sh",
                      self.project / "scripts/server-bootstrap.sh")
+        shutil.copy2(PROJECT / "install.sh", self.project / "install.sh")
         shutil.copy2(PROJECT / "config.sample",
                      self.project / "config.sample")
         shutil.copy2(PROJECT / "compose.yaml",
@@ -33,6 +34,7 @@ class InstallerScriptTests(unittest.TestCase):
             "PATH": f"{self.base}/bin:{os.environ.get('PATH', '')}",
             "GROUPGUARD_BACKUPS": str(self.base / "backups"),
             "GROUPGUARD_MOCK_LOG": str(self.log),
+            "GROUPGUARD_BIN_DIR": str(self.base / "bin"),
         })
         self.fake_bin("docker", """#!/usr/bin/env bash
 set -eu
@@ -321,6 +323,91 @@ install_docker
         self.assertIn('bash "${APP_DIR}/scripts/server-manager.sh" install', source)
         self.assertNotIn('1) (install) || warn', source)
 
+    def test_compact_menu_has_no_ocr_dashboard_or_manual_backup(self):
+        result = self.run_source('tty_line() { REPLY=0; }\nmenu\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for text in ("2. 更新机器人", "gg update", "6. 启动 / 停止 / 重启服务", "7. 卸载"):
+            self.assertIn(text, result.stdout)
+        for text in ("OCR 图片识别开关", "只读网页看板", "8. 备份数据", "9.", "10."):
+            self.assertNotIn(text, result.stdout)
+        self.assertFalse(self.log.exists())
+
+    def test_menu_update_runs_update_then_executes_new_menu(self):
+        result = self.run_source("""
+tty_line() { REPLY=2; }
+bash() {
+  [[ "$1" == "$APP_DIR/scripts/server-manager.sh" && "$2" == update ]] || return 7
+  printf 'UPDATE_DISPATCHED\\n'
+  cat > scripts/server-manager.sh <<'NEW_MANAGER'
+#!/usr/bin/env bash
+printf 'RELOADED:%s\\n' "$1"
+NEW_MANAGER
+}
+menu
+""")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("UPDATE_DISPATCHED", result.stdout)
+        self.assertIn("RELOADED:menu", result.stdout)
+
+    def test_menu_update_failure_keeps_menu_available(self):
+        result = self.run_source("""
+step=0
+tty_line() { if (( step == 0 )); then REPLY=2; else REPLY=0; fi; step=$((step+1)); }
+pause() { :; }
+bash() { return 42; }
+menu
+""")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("更新未成功", result.stderr)
+        self.assertEqual(result.stdout.count("2. 更新机器人"), 2)
+
+    def test_shortcuts_work_from_other_directory_and_preserve_arguments(self):
+        self.provision_env()
+        result = self.run_manager("shortcuts")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ("gg", "GG"):
+            launcher = self.base / "bin" / name
+            self.assertEqual(launcher.stat().st_mode & 0o777, 0o755)
+            result = subprocess.run([str(launcher), "status"], cwd=self.base / "home",
+                env=self.env, text=True, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("服务状态", result.stdout)
+        self.assertEqual(sum(line.startswith("docker compose --profile dashboard ps")
+                             for line in self.log.read_text().splitlines()), 2)
+        result = subprocess.run([str(launcher), "unknown argument"], cwd=self.base / "home",
+            env=self.env, text=True, capture_output=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("未知操作：unknown argument", result.stderr)
+
+    def test_shortcut_registration_is_repeatable_with_spaces_in_paths(self):
+        self.project = self.project.rename(self.base / "app with spaces")
+        self.env["GROUPGUARD_BIN_DIR"] = str(self.base / "launchers with spaces")
+        for _ in range(2):
+            result = self.run_manager("shortcuts")
+            self.assertEqual(result.returncode, 0, result.stderr)
+        result = subprocess.run([str(self.base / "launchers with spaces/GG"), "help"],
+            cwd=self.base / "home", env=self.env, text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(self.project / "scripts/server-manager.sh"), result.stdout)
+        self.assertFalse((self.project / ".env").exists())
+
+    def test_shortcuts_never_overwrite_unrelated_commands_or_symlinks(self):
+        command = self.base / "bin/GG"
+        command.write_text("other program\n")
+        result = self.run_manager("shortcuts")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("不会覆盖", result.stderr)
+        self.assertEqual(command.read_text(), "other program\n")
+        self.assertFalse((self.base / "bin/gg").exists())
+        command.unlink()
+        target = self.base / "another-tool"
+        target.write_text("# GroupGuard managed launcher\n")
+        command.symlink_to(target)
+        result = self.run_manager("shortcuts")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(command.is_symlink())
+        self.assertFalse((self.base / "bin/gg").exists())
+
     def test_uninstall_default_never_purges_volume(self):
         self.provision_env()
         result = self.run_source(
@@ -483,8 +570,8 @@ update
         self.fake_bin("curl", """#!/usr/bin/env bash
 set -eu
 printf 'curl %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
-[[ "$*" == *"raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh"* ]] || exit 3
-cat "$GROUPGUARD_MOCK_SOURCE/scripts/server-bootstrap.sh"
+[[ "$*" == *"raw.githubusercontent.com/slobys/telegram-group-manager/main/install.sh"* ]] || exit 3
+cat "$GROUPGUARD_MOCK_SOURCE/install.sh"
 """)
         self.fake_bin("git", """#!/usr/bin/env bash
 set -eu
@@ -498,7 +585,7 @@ chmod 600 "$dest/.env"
 """)
         command = next(
             line for line in (PROJECT / "README.md").read_text().splitlines()
-            if line.startswith("bash -c 'set -euo pipefail;"))
+            if line.startswith("bash -o pipefail -c 'curl"))
         result = subprocess.run(
             ["bash", "-c", command], cwd=self.project, env=self.env,
             text=True, capture_output=True, timeout=20)
@@ -507,6 +594,8 @@ chmod 600 "$dest/.env"
         self.assertIn("curl -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager", actions)
         self.assertIn("git clone --depth 1 --branch main https://github.com/slobys/telegram-group-manager.git", actions)
         self.assertIn("docker compose up -d --build groupbot", actions)
+        self.assertTrue((self.base / "bin/gg").exists())
+        self.assertTrue((self.base / "bin/GG").exists())
         self.assertNotIn("gh auth", actions)
         self.assertTrue((self.base / "home/groupguard/.env").exists())
         self.assertNotIn(self.token, result.stdout + result.stderr)
@@ -514,39 +603,36 @@ chmod 600 "$dest/.env"
     def test_public_and_docs_commands_are_identical(self):
         readme = next(
             line for line in (PROJECT / "README.md").read_text().splitlines()
-            if line.startswith("bash -c 'set -euo pipefail;"))
+            if line.startswith("bash -o pipefail -c 'curl"))
         docs = next(
             line for line in (PROJECT / "docs/server-one-click.md").read_text().splitlines()
-            if line.startswith("bash -c 'set -euo pipefail;"))
+            if line.startswith("bash -o pipefail -c 'curl"))
         self.assertEqual(readme, docs)
+        self.assertLess(len(readme), 130)
         self.assertNotIn("gh auth", readme)
         self.assertIn("raw.githubusercontent.com/slobys/telegram-group-manager", readme)
 
-    def test_public_one_command_bootstraps_without_curl_or_git(self):
-        """Simulate a fresh Debian SSH server with no curl/git in PATH."""
+    def test_public_one_command_bootstraps_without_git(self):
+        """Simulate Debian SSH with curl/coreutils present but no Git."""
         self.env["GROUPGUARD_MOCK_SOURCE"] = str(self.project)
         self.env["GROUPGUARD_MOCK_TOKEN"] = self.token
         self.env["GROUPGUARD_MOCK_BIN"] = str(self.base / "bin")
         self.env["PATH"] = str(self.base / "bin")
-        # Provide only the other core utilities, deliberately NOT curl or git.
+        # Provide core utilities, deliberately NOT Git.
         for name in ("bash", "uname", "dirname", "pwd", "cat", "cp",
-                     "chmod", "mkdir", "grep", "id"):
+                     "chmod", "mkdir", "grep", "id", "mktemp", "install", "rm"):
             target = shutil.which(name)
             self.assertIsNotNone(target)
             (self.base / "bin" / name).symlink_to(target)
+        self.fake_bin("curl", """#!/usr/bin/env bash
+set -eu
+printf 'curl %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+cat "$GROUPGUARD_MOCK_SOURCE/install.sh"
+""")
         self.fake_bin("apt-get", """#!/usr/bin/env bash
 set -eu
 printf 'apt-get %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
 [[ "$1" == "install" ]] || exit 0
-if [[ "$*" == *"curl"* ]]; then
-  cat > "$GROUPGUARD_MOCK_BIN/curl" <<'MOCK_CURL'
-#!/usr/bin/env bash
-set -eu
-printf 'curl %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
-cat "$GROUPGUARD_MOCK_SOURCE/scripts/server-bootstrap.sh"
-MOCK_CURL
-  chmod +x "$GROUPGUARD_MOCK_BIN/curl"
-fi
 if [[ "$*" == *"git"* ]]; then
   cat > "$GROUPGUARD_MOCK_BIN/git" <<'MOCK_GIT'
 #!/usr/bin/env bash
@@ -564,19 +650,93 @@ fi
 """)
         command = next(
             line for line in (PROJECT / "README.md").read_text().splitlines()
-            if line.startswith("bash -c 'set -euo pipefail;"))
+            if line.startswith("bash -o pipefail -c 'curl"))
         result = subprocess.run(
             [str(self.base / "bin/bash"), "-c", command],
             cwd=self.project, env=self.env, text=True,
             capture_output=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.log.read_text()
-        self.assertIn("apt-get install -y curl ca-certificates", calls)
         self.assertIn("apt-get install -y git ca-certificates", calls)
         self.assertIn("git clone --depth 1 --branch main https://github.com/slobys/telegram-group-manager.git", calls)
         self.assertIn("docker compose up -d --build groupbot", calls)
         self.assertNotIn("gh auth", calls)
         self.assertNotIn(self.token, result.stdout + result.stderr)
+
+    def test_public_download_failure_is_not_reported_as_success(self):
+        command = next(line for line in (PROJECT / "README.md").read_text().splitlines()
+                       if line.startswith("bash -o pipefail -c 'curl"))
+        self.fake_bin("curl", "#!/usr/bin/env bash\nexit 22\n")
+        result = subprocess.run(["bash", "-c", command], cwd=self.base / "home",
+            env=self.env, text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 22)
+        self.assertFalse((self.base / "home/groupguard").exists())
+        self.assertFalse(self.log.exists())
+        empty_bin = self.base / "empty-bin"
+        empty_bin.mkdir()
+        (empty_bin / "bash").symlink_to(shutil.which("bash"))
+        result = subprocess.run([shutil.which("bash"), "-c", command], cwd=self.base / "home",
+            env={**self.env, "PATH": str(empty_bin)}, text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("curl", result.stderr)
+        self.assertFalse((self.base / "home/groupguard").exists())
+
+    def test_local_install_retains_repair_behavior(self):
+        self.provision_env()
+        result = subprocess.run(["bash", str(self.project / "install.sh")],
+            cwd=self.base / "home", env=self.env, text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("一键安装 / 修复安装", result.stdout)
+        self.assertFalse((self.base / "home/groupguard").exists())
+        self.assertTrue((self.base / "bin/gg").exists())
+
+    def test_online_entry_upgrades_old_install_then_registers_shortcuts(self):
+        installed = self.base / "home/groupguard"
+        shutil.copytree(self.project, installed)
+        (installed / ".git").mkdir()
+        (installed / ".env").write_text(f"BOT_TOKEN={self.token}\n")
+        old_manager = installed / "scripts/server-manager.sh"
+        old_manager.write_text("""#!/usr/bin/env bash
+set -eu
+[[ "$1" == update ]] || exit 8
+printf 'OLD_MANAGER_UPDATE\\n' >> "$GROUPGUARD_MOCK_LOG"
+cp "$GROUPGUARD_MOCK_SOURCE/scripts/server-manager.sh" "$0.new"
+mv -f -- "$0.new" "$0"
+""")
+        self.env["GROUPGUARD_MOCK_SOURCE"] = str(self.project)
+        self.fake_bin("git", "#!/usr/bin/env bash\necho https://github.com/slobys/telegram-group-manager.git\n")
+        # Feed the downloaded entry through stdin exactly as the public command.
+        result = subprocess.run(["bash"], input=(self.project / "install.sh").read_text(),
+            cwd=self.base / "home", env=self.env, text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("OLD_MANAGER_UPDATE", self.log.read_text())
+        self.assertTrue((self.base / "bin/gg").exists())
+        self.assertTrue((self.base / "bin/GG").exists())
+        self.assertIn(self.token, (installed / ".env").read_text())
+        self.assertNotIn(self.token, result.stdout + result.stderr)
+
+    def test_original_bootstrap_url_still_delegates_to_public_entry(self):
+        self.env["GROUPGUARD_MOCK_SOURCE"] = str(self.project)
+        self.fake_bin("curl", """#!/usr/bin/env bash
+set -eu
+[[ "$*" == *"/main/install.sh"* ]] || exit 3
+while [[ "$1" != -o ]]; do shift; done
+cp "$GROUPGUARD_MOCK_SOURCE/install.sh" "$2"
+""")
+        self.fake_bin("git", """#!/usr/bin/env bash
+set -eu
+[[ "$1" == clone ]] || exit 3
+dest="${@: -1}"
+mkdir -p "$dest"
+cp -R "$GROUPGUARD_MOCK_SOURCE"/. "$dest/"
+printf 'BOT_TOKEN=%s\\n' "$GROUPGUARD_MOCK_TOKEN" > "$dest/.env"
+""")
+        self.env["GROUPGUARD_MOCK_TOKEN"] = self.token
+        result = subprocess.run(["bash"], input=(self.project / "scripts/server-bootstrap.sh").read_text(),
+            cwd=self.base / "home", env=self.env, text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.base / "bin/GG").exists())
+        self.assertIn("docker compose up -d --build groupbot", self.log.read_text())
 
 
 if __name__ == "__main__":

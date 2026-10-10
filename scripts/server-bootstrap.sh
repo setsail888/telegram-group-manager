@@ -1,56 +1,23 @@
 #!/usr/bin/env bash
-# GroupGuard first-run bootstrap for the public GitHub repository.
-# Run as the ordinary SSH user, never as root via sudo bash.
+# Compatibility entry for the original public bootstrap URL.
 set +x
 set -Eeuo pipefail
 umask 077
 
-readonly REPO="https://github.com/slobys/telegram-group-manager.git"
-INSTALL_DIR="${GROUPGUARD_DIR:-${HOME}/groupguard}"
-
-say() { printf '\n\033[1;36m[GroupGuard]\033[0m %s\n' "$*"; }
-fail() { printf '\n[GroupGuard] 错误：%s\n' "$*" >&2; exit 1; }
-
-[[ "${BASH_VERSINFO[0]}" -ge 4 ]] || fail "需要 Bash 4 或更高版本"
-[[ "$(uname -s)" == "Linux" ]] || fail "仅支持 Linux 服务器"
-
-if ! command -v git >/dev/null 2>&1; then
-  say "尚未安装 Git，准备在 Debian / Ubuntu 上自动安装"
-  [[ -r /etc/os-release ]] || fail "无法识别操作系统，请手动安装 Git"
-  # shellcheck source=/dev/null
-  source /etc/os-release
-  case "${ID}" in
-    debian|ubuntu) ;;
-    *) fail "此发行版尚不支持自动安装 Git，请先自行安装" ;;
-  esac
-  if [[ "${EUID}" -eq 0 ]]; then
-    apt-get update && apt-get install -y git ca-certificates ||
-      fail "安装 Git 失败，请检查软件源"
-  else
-    command -v sudo >/dev/null 2>&1 || fail "缺少 sudo，无法安装 Git"
-    sudo apt-get update && sudo apt-get install -y git ca-certificates ||
-      fail "安装 Git 失败，请检查 sudo 权限和软件源"
+if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
+  source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+  if [[ -f "${source_dir}/install.sh" && -f "${source_dir}/compose.yaml" ]]; then
+    exec bash "${source_dir}/install.sh"
   fi
 fi
-command -v git >/dev/null 2>&1 || fail "Git 未安装成功"
 
-if [[ -e "${INSTALL_DIR}" && ! -d "${INSTALL_DIR}/.git" ]]; then
-  fail "${INSTALL_DIR} 已存在但并非本项目 Git 仓库；不会覆盖，请另选 GROUPGUARD_DIR"
-fi
-
-if [[ -d "${INSTALL_DIR}/.git" ]]; then
-  if ! git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null |
-       grep -Eq '^((https://github\.com/)|(git@github\.com:))slobys/telegram-group-manager(\.git)?$'; then
-    fail "目标目录是其他 Git 仓库，禁止覆盖"
-  fi
-  say "发现已安装的 GroupGuard，将运行修复安装；更新源码请使用管理菜单第 2 项。"
-else
-  say "开始从公开 GitHub 仓库克隆 GroupGuard 到 ${INSTALL_DIR}，无需 GitHub 登录"
-  GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch main "${REPO}" "${INSTALL_DIR}" ||
-    fail "克隆失败，请检查 GitHub 网络连接或重试"
-fi
-
-[[ -f "${INSTALL_DIR}/scripts/server-manager.sh" ]] ||
-  fail "下载的仓库缺少安装管理脚本"
-say "即将进入中文部署菜单"
-exec bash "${INSTALL_DIR}/scripts/server-manager.sh" install
+command -v curl >/dev/null 2>&1 || {
+  printf '需要 curl，请先安装 curl 和 ca-certificates。\n' >&2
+  exit 1
+}
+installer="$(mktemp "${TMPDIR:-/tmp}/groupguard-install.XXXXXXXX.sh")"
+trap 'rm -f -- "$installer"' EXIT
+curl --proto '=https' --tlsv1.2 --connect-timeout 20 --max-time 120 \
+  -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager/main/install.sh -o "${installer}"
+[[ -s "${installer}" ]] || { printf '下载安装脚本为空，已停止。\n' >&2; exit 1; }
+bash "${installer}"
