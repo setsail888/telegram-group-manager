@@ -63,6 +63,30 @@ exec "$@"
         path.write_text(contents, encoding="utf-8")
         path.chmod(0o755)
 
+    def fake_docker_installer_download(self, *, exit_code=0, empty=False):
+        self.fake_bin("curl", """#!/usr/bin/env bash
+set -eu
+printf 'official-curl %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+while [[ "$#" -gt 0 ]]; do
+  if [[ "$1" == "-o" ]]; then
+    shift
+    if [[ "$MOCK_DOCKER_CURL_EXIT" != "0" ]]; then
+      exit "$MOCK_DOCKER_CURL_EXIT"
+    fi
+    if [[ "$MOCK_DOCKER_CURL_EMPTY" != "1" ]]; then
+      printf '#!/bin/sh\\nexit 0\\n' > "$1"
+    fi
+    exit 0
+  fi
+  shift
+done
+exit 99
+""")
+        self.env["MOCK_DOCKER_CURL_EXIT"] = str(exit_code)
+        self.env["MOCK_DOCKER_CURL_EMPTY"] = "1" if empty else "0"
+        (self.base / "tmp").mkdir(exist_ok=True)
+        self.env["TMPDIR"] = str(self.base / "tmp")
+
     def run_manager(self, command="help"):
         return subprocess.run(
             ["bash", "scripts/server-manager.sh", command],
@@ -134,120 +158,119 @@ exec "$@"
         self.assertNotIn("apt-get", calls)
         self.assertNotIn(self.token, result.stdout + result.stderr + calls)
 
-    def test_existing_docker_without_compose_v2_is_not_overwritten(self):
+    def test_existing_docker_without_compose_v2_installs_plugin_only(self):
+        self.provision_env()
+        self.fake_bin("docker", """#!/usr/bin/env bash
+set -eu
+printf 'docker %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+if [[ "$1" == "compose" && "$2" == "version" ]]; then
+  test -f "$HOME/compose-installed"
+fi
+""")
+        self.fake_bin("apt-get", """#!/usr/bin/env bash
+set -eu
+printf 'apt-get %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+[[ "$*" == *"--no-remove install docker-compose-plugin"* ]] || exit 51
+touch "$HOME/compose-installed"
+""")
+        result = self.run_source(
+            "check_os() { :; }\ninstall_docker\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.log.read_text()
+        self.assertIn("apt-get -y --no-remove install docker-compose-plugin", calls)
+        self.assertNotIn("official-curl", calls)
+        self.assertNotIn("docker-ce docker-ce-cli", calls)
+
+    def test_existing_docker_plugin_install_failure_does_not_replace_engine(self):
         self.provision_env()
         self.fake_bin("docker", """#!/usr/bin/env bash
 if [[ "$1" == "compose" && "$2" == "version" ]]; then exit 1; fi
 exit 0
 """)
-        result = self.run_manager("install")
+        self.fake_bin("apt-get", """#!/usr/bin/env bash
+printf 'apt-get %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+exit 100
+""")
+        result = self.run_source(
+            "check_os() { :; }\ninstall_docker\n")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("缺少 Compose V2", result.stderr)
-        self.assertFalse(self.log.exists())
+        self.assertIn("补装 Docker Compose V2", result.stderr)
+        self.assertIn("退出码 100", result.stderr)
+        self.assertNotIn("docker-ce docker-ce-cli", self.log.read_text())
 
-    def test_docker_apt_index_failure_stops_with_reason(self):
+    def test_official_download_fails_fast_without_running_shell(self):
         self.provision_env()
+        self.fake_docker_installer_download(exit_code=60)
         result = self.run_source("""
 docker_available() { return 1; }
-check_os() {
-  ID=ubuntu
-  DOCKER_APT_SUITE=noble
-  DOCKER_APT_ARCH=amd64
-}
-root() {
-  printf 'MOCK ROOT: %s\\n' "$*" >&2
-  return 100
-}
+docker_daemon_binary_present() { return 1; }
+check_os() { :; }
+root() { echo UNEXPECTED_ROOT >> "$GROUPGUARD_MOCK_LOG"; }
 install_docker
 echo 'THIS MUST NOT PRINT'
 """)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("1/7 更新系统 apt 软件包索引", result.stdout + result.stderr)
-        self.assertIn("退出码 100", result.stderr)
-        self.assertIn("不要反复选择安装", result.stderr)
-        self.assertNotIn("THIS MUST NOT PRINT", result.stdout)
-        self.assertNotIn("Docker Engine 和 Compose V2 的软件包安装已成功",
-                         result.stdout)
-
-    def test_docker_failed_install_never_starts_groupbot(self):
-        result = self.run_source("""
-docker_available() { return 1; }
-check_os() {
-  ID=debian
-  DOCKER_APT_SUITE=bookworm
-  DOCKER_APT_ARCH=amd64
-}
-root() { return 100; }
-(install) || warn "安装失败，等待人工检查 apt 错误"
-echo "SHELL_CAN_RETURN_TO_MENU"
-""")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("1/7 更新系统 apt 软件包索引", result.stderr)
-        self.assertIn("退出码 100", result.stderr)
-        self.assertIn("安装失败，等待人工检查 apt 错误", result.stderr)
-        self.assertIn("SHELL_CAN_RETURN_TO_MENU", result.stdout)
-        self.assertFalse((self.project / ".env").exists())
-        self.assertFalse(self.log.exists())
-
-    def test_docker_gpg_download_failure_stops_with_reason(self):
-        self.provision_env()
-        result = self.run_source("""
-docker_available() { return 1; }
-check_os() {
-  ID=debian
-  DOCKER_APT_SUITE=trixie
-  DOCKER_APT_ARCH=amd64
-}
-root() {
-  printf 'MOCK ROOT: %s\\n' "$*" >&2
-  if [[ "$1" == curl ]]; then return 60; fi
-  return 0
-}
-install_docker
-echo 'THIS MUST NOT PRINT'
-""")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("4/7 从 Docker 官网下载 GPG 密钥", result.stdout + result.stderr)
+        self.assertIn("下载 Docker 官方安装脚本", result.stderr)
         self.assertIn("退出码 60", result.stderr)
+        self.assertNotIn("UNEXPECTED_ROOT", self.log.read_text())
         self.assertNotIn("THIS MUST NOT PRINT", result.stdout)
+        self.assertEqual(list((self.base / "tmp").iterdir()), [])
 
-    def test_docker_package_install_failure_does_not_claim_success(self):
-        self.provision_env()
+    def test_official_download_empty_does_not_run(self):
+        self.fake_docker_installer_download(empty=True)
         result = self.run_source("""
 docker_available() { return 1; }
-check_os() {
-  ID=ubuntu
-  DOCKER_APT_SUITE=noble
-  DOCKER_APT_ARCH=amd64
-}
+docker_daemon_binary_present() { return 1; }
+check_os() { :; }
+root() { echo UNEXPECTED_ROOT >> "$GROUPGUARD_MOCK_LOG"; }
+install_docker
+""")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Docker 脚本为空", result.stderr)
+        self.assertNotIn("UNEXPECTED_ROOT", self.log.read_text())
+        self.assertEqual(list((self.base / "tmp").iterdir()), [])
+
+    def test_official_installer_exit_error_stops_without_compose_or_bot(self):
+        self.fake_docker_installer_download()
+        result = self.run_source("""
+docker_available() { return 1; }
+docker_daemon_binary_present() { return 1; }
+check_os() { :; }
 root() {
-  if [[ "$1" == tee ]]; then cat >/dev/null; return 0; fi
-  if [[ "$*" == *"docker-ce docker-ce-cli"* ]]; then return 100; fi
-  return 0
+  printf 'root %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+  if [[ "$1" == "sh" ]]; then return 100; fi
 }
 install_docker
 echo 'THIS MUST NOT PRINT'
 """)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("7/7 安装 Docker Engine、Buildx 与 Compose V2",
-                      result.stdout + result.stderr)
+        self.assertIn("执行 Docker 官方快捷安装脚本", result.stderr)
         self.assertIn("退出码 100", result.stderr)
-        self.assertNotIn("Docker Engine 和 Compose V2 的软件包安装已成功",
-                         result.stdout)
+        self.assertNotIn("docker compose up", self.log.read_text())
+        self.assertEqual(list((self.base / "tmp").iterdir()), [])
         self.assertNotIn("THIS MUST NOT PRINT", result.stdout)
 
-    def test_docker_clean_install_simulated_completes_all_steps(self):
-        self.provision_env()
+    def test_docker_daemon_detected_without_client_is_not_reinstalled(self):
+        self.fake_docker_installer_download()
+        result = self.run_source("""
+docker_available() { return 1; }
+docker_daemon_binary_present() { return 0; }
+check_os() { :; }
+install_docker
+""")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("检测到已有 dockerd", result.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_docker_official_install_simulated_success_and_temp_cleanup(self):
+        self.fake_docker_installer_download()
         result = self.run_source("""
 docker_available() { [[ -f "$HOME/docker-installed" ]]; }
-check_os() {
-  ID=ubuntu
-  DOCKER_APT_SUITE=noble
-  DOCKER_APT_ARCH=amd64
-}
+docker_daemon_binary_present() { return 1; }
+check_os() { :; }
 root() {
-  if [[ "$1" == tee ]]; then cat >/dev/null; return 0; fi
-  if [[ "$*" == *"docker-ce docker-ce-cli"* ]]; then
+  printf 'root %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+  if [[ "$1" == "sh" ]]; then
     touch "$HOME/docker-installed"
   fi
   return 0
@@ -255,10 +278,15 @@ root() {
 install_docker
 """)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("7/7 安装 Docker Engine、Buildx 与 Compose V2",
+        self.assertIn("下载 Docker 官方安装脚本",
+                      result.stdout + result.stderr)
+        self.assertIn("执行 Docker 官方快捷安装脚本",
                       result.stdout + result.stderr)
         self.assertIn("Docker Engine、Compose V2 和守护进程检查通过",
                       result.stdout)
+        self.assertIn("curl --proto =https --tlsv1.2", self.log.read_text())
+        self.assertIn("root sh ", self.log.read_text())
+        self.assertEqual(list((self.base / "tmp").iterdir()), [])
 
     def test_menu_launches_install_in_isolated_bash(self):
         source = (PROJECT / "scripts/server-manager.sh").read_text()

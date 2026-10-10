@@ -40,7 +40,7 @@ bash -c 'set -euo pipefail; command -v curl >/dev/null 2>&1 || { if [ "$(id -u)"
 1. 如果缺少 curl，会自动通过 apt 安装 curl 和证书；启动脚本还会检测并安装缺失的 Git。
 2. 直接从公开 GitHub 仓库下载启动脚本，无需 GitHub 登录或授权码。
 3. 使用 git clone 克隆项目到当前 SSH 用户的 **~/groupguard**（已有同名安装时检查远程地址，不会覆盖其他项目）。
-4. 若没有 Docker，按 Docker 官方 apt 仓库流程安装 Docker Engine、Buildx、Compose V2；若已有 Docker 和 Compose V2，则保留现有环境。已有 Docker 但缺少 Compose V2 时**不会替换或卸载原有 Docker**。
+4. 若没有 Docker，先下载 Docker 官方快捷安装脚本 https://get.docker.com 到临时文件，再用 sudo/root 执行，随后核验 Engine 和 Compose V2；若已有 Docker 则**跳过重新安装 Engine**，缺少 Compose V2 时只尝试补装插件，不卸载已有容器或软件。
 5. 首次生成权限为 600 的 ~/groupguard/.env，隐藏输入 BotFather Token 并检查格式。
 6. 校验 Compose 配置，构建容器，启动 groupbot 并显示运行状态。
 
@@ -179,7 +179,11 @@ git pull --ff-only origin main
 bash scripts/server-manager.sh install
 ~~~
 
-修复后会依次显示 **1/7 更新系统 apt → 2/7 安装 HTTPS/证书 → 3/7 创建密钥目录 → 4/7 Docker GPG 密钥 → 5/7 Docker 软件源 → 6/7 更新 Docker apt 索引 → 7/7 安装 Docker Engine/Compose**。失败时显示错误步骤及退出码，并立即停止；不要反复进入菜单。
+Docker 安装现在已改成你原先 Docker 项目采用的**官方快捷方式**，不再由 GroupGuard 自行配置七步 apt/GPG 软件源。实际安装会显示两项关键步骤：**下载 Docker 官方脚本**、**执行官方脚本**，然后检查 Docker Engine、Compose V2 和 daemon 是否可用。下载脚本使用限时 HTTPS、临时文件和退出清理；失败会显示具体步骤和退出码并停止。
+
+不同于旧项目额外下载独立的 docker-compose 二进制，本项目只要求 docker compose（V2 CLI 插件）。如果 Docker 已安装但没有该插件，才会尝试通过 apt 安装 docker-compose-plugin，使用 --no-remove 阻止卸载已有软件。
+
+Docker 官方声明，get.docker.com 主要适用于开发、测试及快速配置；长期生产部署推荐 Docker 官方 apt 软件源并使用系统包管理器更新。脚本在执行前可供检查，源码见 [Docker 官方 docker-install](https://github.com/docker/docker-install)。
 
 如果再次失败，复制以下自检命令的输出（**请先隐藏服务器 IP、代理密码等敏感内容**）：
 

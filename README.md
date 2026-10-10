@@ -28,7 +28,7 @@ git pull --ff-only origin main
 bash scripts/server-manager.sh install
 ~~~
 
-新版 Docker 安装会显示分步骤执行和真正的 apt/curl 错误；失败会立即停止并显示退出码。请勿反复输入菜单序号 1，也不要为了排查而卸载服务器已有的 Docker。进一步排查详见 [Docker 安装失败](docs/server-one-click.md#docker-安装失败及重复提示)。
+新版 Docker 安装已精简为**下载并运行 Docker 官方快捷脚本 https://get.docker.com**，不再自己维护七步 GPG/apt 配置。仅当服务器完全没有 Docker 时才调用；已有 Docker 会跳过重装，并检查 GroupGuard 所需的 **Compose V2 插件**。若缺少插件，仅尝试单独补装，不卸载已有软件。下载、安装失败会显示错误原因及退出码。请勿反复输入菜单序号 1，详见 [Docker 安装失败](docs/server-one-click.md#docker-安装失败及重复提示)。
 
 安装目录默认为 **~/groupguard**；数据库在 Docker 命名卷；备份默认在 **~/groupguard-backups**。**卸载默认保留数据，删除积分数据库必须再输入完整二次确认口令。**
 
