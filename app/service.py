@@ -116,8 +116,14 @@ class GroupBot:
         return self.api.safe("sendMessage", chat_id=chat_id, text=str(text)[:4000], **kwargs)
 
     def answer(self, query_id, text="", alert=False):
-        self.api.safe("answerCallbackQuery", callback_query_id=query_id,
-                      text=str(text)[:190], show_alert=alert)
+        params = {"callback_query_id": query_id,
+                  "text": str(text)[:190], "show_alert": alert}
+        # After authorization, a routine ACK and page edit can run in
+        # parallel. Important permission/error alerts remain synchronous.
+        background = getattr(self.api, "answer_background", None)
+        if not alert and callable(background) and background(**params):
+            return
+        self.api.safe("answerCallbackQuery", **params)
 
     def log(self, chat_id, action, actor=None, target=None):
         # Logging is best effort and intentionally never shows moderation in the group.

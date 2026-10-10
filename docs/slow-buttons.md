@@ -5,12 +5,19 @@
 ## 本项目已优化的代码问题
 
 - **移除重复权限查询**：每次管理按钮入口仍必须通过 Telegram 最新的 getChatMember 核实操作人是否为该群管理员；核实后同一次点击进入页面，不再重复发第二次同样的请求。下一次点击仍会重新检查身份，不能通过缓存旧权限绕过验证。
+- **非阻塞按钮确认**：对已经通过权限校验的普通按钮，answerCallbackQuery（清除 Telegram 按钮加载状态）与 editMessageText（更新页面）并行发送，而不是连续等待两次网络往返。错误、权限不足等重要弹窗仍会同步返回。
+- **HTTPS 长连接复用**：普通 API 统一使用 Requests 连接池，连续请求可以复用已有的 TCP/TLS 连接；连接池按线程隔离，支持系统 HTTPS 代理。网络失败后放弃故障连接，不自动重发删除、禁言、封禁或发送消息等有副作用的操作。
+- **限制异步任务**：同时最多两个后台按钮确认请求，等待队列有限；退出时先完成待处理确认并关闭 HTTP 会话，不会启动无限线程。
 - **限制非轮询请求卡住整个机器人**：getChatMember、answerCallbackQuery、editMessageText 等普通请求超时时间从 35 秒降为 15 秒；getUpdates 长轮询仍保留独立超时。
 - **避免重复发菜单**：相同页面重复编辑时，Telegram 的 message is not modified 会被正确当成正常结果，不再发送另一条重复菜单。
 - **优先展示新页面**：有独立管理日志群时，原来部分按钮先向日志群发记录再更新页面。现在先更新面板，再继续发送审计日志；不会牺牲日志功能。
 - **加入耗时日志**：普通 Telegram API 请求或完整按钮处理超过 2.5 秒，会在服务日志记录耗时（仅方法名/秒数，不包含 Bot Token、按钮参数、消息或用户 ID）。getUpdates 正常等待 25 秒不算慢请求。
 
 注意：这只能减少代码本身的重复等待。**如果服务器到 api.telegram.org 的单次 HTTPS 往返就需要数秒，用户仍会感到延迟**；这需要检查服务器出口网络、代理、DNS 等因素。
+
+### 为什么单次 getMe 是 0.62 秒，点击面板仍要 2–3 秒？
+
+此前普通按钮至少连续请求一次 getChatMember、一次 answerCallbackQuery、一次 editMessageText。假设每次 API 往返均为 0.62 秒，忽略其他处理时间，串行请求的总耗时约 **1.86 秒**。在一个**完全离线、每次人为增加 0.62 秒**的模拟环境中，新版并发 ACK 后，面板更新耗时从 1.86 秒降到约 1.24 秒，模拟节省约 0.62 秒；HTTPS 连接复用还可能继续减少握手耗时。这个数字不是生产云服务器的实测结果，也不是对速度的保证。若实际网络经常波动，应继续使用以下日志定位。
 
 ## 1. 在服务器更新并查看日志
 
@@ -30,6 +37,16 @@ Telegram 管理按钮处理耗时 7.10 秒；请检查上方的 API 响应慢记
 
 如果只有 editMessageText 请求很慢，重点查看 Telegram API 网络。如果日志中持续出现网络连接中断、HTTP 429 或频繁重试，也可能拖慢单线程消息队列。
 
+**如果总延迟只有 2–3 秒、没有触发默认的 2.5 秒慢请求日志**，可以临时开启逐请求诊断。修改服务器本地文件 ~/groupguard/.env，在末尾添加 LATENCY_DEBUG=1（或把已有的 LATENCY_DEBUG=0 改为 1），然后执行：
+
+~~~bash
+cd ~/groupguard
+docker compose up -d --force-recreate groupbot
+docker compose logs -f --tail=30 groupbot
+~~~
+
+再点击几次功能按钮，日志会显示实际 API 方法和各自耗时（例如 getChatMember、answerCallbackQuery、editMessageText），从而区分网络与页面处理的等待。诊断结束后**将 LATENCY_DEBUG 改回 0，并执行同样的 force-recreate 命令**。本选项不打印 Token、群 ID、用户 ID 或 callback_data，默认关闭以免日志过多。
+
 ## 2. 单独测量服务器连接 Telegram API 的速度
 
 下面的命令在已运行的 **GroupGuard 容器**里调用一次安全的 getMe 查询，并显示耗时。Token 直接读取容器环境变量，**不会显示到屏幕或日志**。
@@ -45,6 +62,27 @@ docker ps --format '{{.Names}}'
 ~~~
 
 getMe 只能测**一次 API 请求的网络及处理时间**，不能代表完整面板操作的所有耗时。建议相隔几秒运行两三次，看是否经常出现明显波动。
+
+更新到支持 Requests 连接池的版本后，也可以在**同一个 Python 进程内连续测试三次**，查看首次建立 HTTPS 连接和后续复用的差异：
+
+~~~bash
+docker exec -i groupguard-groupbot-1 python - <<'PY'
+import os
+import time
+from app.api import TelegramAPI
+
+api = TelegramAPI(os.environ["BOT_TOKEN"], os.environ.get("API_BASE", "https://api.telegram.org"))
+try:
+    for index in range(1, 4):
+        started = time.monotonic()
+        api.call("getMe")
+        print(f"Telegram 第 {index} 次 getMe 耗时：{time.monotonic() - started:.2f} 秒")
+finally:
+    api.close()
+PY
+~~~
+
+这条命令不会在屏幕输出 Token；测试程序也不会影响机器人现有的长轮询。
 
 另一种不需要 Token 的 HTTPS 连接检查：
 

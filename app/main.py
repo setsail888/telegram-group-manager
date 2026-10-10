@@ -46,6 +46,8 @@ def run(api, store, config):
     last_cleanup = 0
     last_scheduler = 0
     last_prune = 0
+    trace_latency = os.getenv("LATENCY_DEBUG", "0").lower() in (
+        "1", "true", "yes", "on")
     while _running:
         try:
             bot.drain_ocr()
@@ -102,6 +104,8 @@ def run(api, store, config):
                             "Telegram 管理按钮处理耗时 %.2f 秒；"
                             "请检查上方的 API 响应慢记录及服务器网络",
                             elapsed)
+                    elif "callback_query" in update and trace_latency:
+                        LOG.info("Telegram 管理按钮处理耗时 %.2f 秒", elapsed)
                 # Consume a poison update rather than entering an infinite loop.
                 store.save_offset(update_id)
         except TelegramAPIError as exc:
@@ -126,12 +130,14 @@ def main():
         LOG.error("%s", exc)
         raise SystemExit(2) from None
     store = Store(cfg.db_path, timezone=os.getenv("TZ", "Asia/Shanghai"))
+    api = TelegramAPI(cfg.token, cfg.api_base)
     try:
-        run(TelegramAPI(cfg.token, cfg.api_base), store, cfg)
+        run(api, store, cfg)
     except TelegramAPIError as exc:
         LOG.error("启动失败：%s", exc)
         raise SystemExit(1) from None
     finally:
+        api.close()
         store.close()
 
 
