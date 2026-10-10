@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from app.command_menu import install_commands
-from app.i18n import CURRENT_LANGUAGE, LocalizedAPI, Text, catalog, error_text, join_text, msg, render
+from app.i18n import CURRENT_LANGUAGE, LOCALES, LocalizedAPI, Text, catalog, error_text, join_text, msg, render
 from app.service import GroupBot, MENU_MODULES
 from app.store import Store, DEFAULTS
 from app.word_library import catalog as word_catalog
@@ -40,12 +40,15 @@ class TranslationTests(unittest.TestCase):
         spec.loader.exec_module(module)
         inventory = module.inventory()
         self.assertEqual(json.loads((root/"app/locales/sources.json").read_text(encoding="utf-8")), inventory)
-        translated = catalog("en")
-        for source in inventory:
-            with self.subTest(source=source):
-                self.assertIn(source, translated)
-                self.assertEqual(module.placeholders(source), module.placeholders(translated[source]))
-                self.assertTrue(translated[source])
+        for locale in LOCALES:
+            if locale == "zh-CN":
+                continue
+            translated = catalog(locale)
+            for source in inventory:
+                with self.subTest(locale=locale, source=source):
+                    self.assertIn(source, translated)
+                    self.assertEqual(module.placeholders(source), module.placeholders(translated[source]))
+                    self.assertTrue(translated[source].strip())
 
     def test_trusted_pack_names_translate_but_keywords_do_not(self):
         pack = word_catalog()["task_scam"]
@@ -96,7 +99,7 @@ class LanguageWorkflowTests(unittest.TestCase):
         self.assertEqual(CURRENT_LANGUAGE.get(), "zh-CN")
 
     def test_missing_or_unsupported_client_language_falls_back_to_chinese(self):
-        for uid, language in ((2, None), (3, "fr")):
+        for uid, language in ((2, None), (3, "ja")):
             self.private("/start", uid=uid, **({"language_code": language} if language else {}))
             self.assertEqual(self.store.ui_language(uid), "zh-CN")
             self.assertIn("暂未", self.page()["text"])
@@ -105,7 +108,7 @@ class LanguageWorkflowTests(unittest.TestCase):
 
     def test_language_command_deep_link_and_nonadmin_entry(self):
         self.private("/language", uid=2)
-        self.assertIn("界面语言", self.page()["text"])
+        self.assertIn("控制面板语言", self.page()["text"])
         self.private("/start language", uid=2)
         self.assertIn("lang:set:2:en", json.dumps(self.page()["reply_markup"]))
         self.click("lang:self", uid=2)
@@ -127,7 +130,7 @@ class LanguageWorkflowTests(unittest.TestCase):
         self.assertIn("Be respectful", self.page()["text"])
         self.click("lang:set:-1001:zh-CN")
         self.assertEqual(self.store.ui_language(1), "en")
-        self.assertIn("Interface language", self.page()["text"])
+        self.assertIn("Group notice language", self.page()["text"])
 
     def test_group_messages_do_not_create_personal_preferences(self):
         self.bot.handle_update({"message": {"message_id": 30, "from": {"id": 3, "language_code": "en"},
@@ -143,7 +146,7 @@ class LanguageWorkflowTests(unittest.TestCase):
             self.assertEqual(self.store.ui_language(-1001), "zh-CN")
             self.assertEqual(self.store.ui_language(1), "zh-CN")
         self.click("v:-1001:language")
-        self.assertIn("本群系统提示", self.page()["text"])
+        self.assertIn("选择控制面板语言", self.page()["text"])
         with patch.object(self.bot, "is_admin", return_value=False):
             self.click("lang:set:-1001:en")
         self.assertEqual(self.store.ui_language(-1001), "zh-CN")

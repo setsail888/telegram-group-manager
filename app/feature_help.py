@@ -369,9 +369,11 @@ OCR删除不追加违禁词/防刷屏的禁言、踢出、封禁，也不计全�
 不要求积分或商城开启，没有定时自动开奖，奖励需管理员兑现。开奖前复核在群与验证状态，没有参与者不能开奖；公告发送失败时结果仍保存，先查历史再判断是否完成。"""), "community/raffle.html"),
     "language": (_ui("""📖 界面语言 · 功能说明
 
-目前支持简体中文和English，两类设置分别保存：
+目前支持中文、English及法语、德语、西班牙语、俄语等共26种界面语言，两类设置分别保存：
 • 个人语言：改变本人私聊管理页、成员服务和系统按钮，不改变其他人。
 • 群内提示语言：改变选中群的系统提示、验证和命令回复，需该群管理员权限。
+
+在群控制面板点击“语言 / Language”，选择后立即切换并返回当前群面板；“单独设置群内提示语言”另行修改群内提示。
 
 例如个人English、群中文时，你的私聊按钮英文，群里验证仍中文。自定义欢迎语、群规、公告、自动回复、奖励、关键词和昵称保留原文，不自动翻译。
 
@@ -511,6 +513,6 @@ class FeatureHelp:
             )
         return self._show(uid, cid, topic, mid, f"pc:{cid}:{target}:0", links)
 
-    def language(self, uid, owner, mid):
-        back = f"lang:group:{owner}" if owner < 0 else "lang:self"
+    def language(self, uid, owner, mid, *, back=None):
+        back = back or (f"lang:group:{owner}" if owner < 0 else "lang:self")
         return self._show(uid, owner if owner < 0 else None, "language", mid, back)

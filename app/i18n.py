@@ -4,18 +4,34 @@ from functools import lru_cache
 import json
 from pathlib import Path
 
-LOCALES = {"zh-CN": "简体中文", "en": "English"}
+LOCALES = {
+    "zh-CN": "🇨🇳 简体中文", "en": "🇺🇸 English",
+    "fr": "🇫🇷 Français", "de": "🇩🇪 Deutsch",
+    "es": "🇪🇸 Español", "ru": "🇷🇺 Русский",
+    "pt": "🇵🇹🇧🇷 Português", "it": "🇮🇹 Italiano",
+    "el": "🇬🇷 Ελληνικά", "nl": "🇳🇱 Nederlands",
+    "pl": "🇵🇱 Polski", "id": "🇮🇩 Bahasa Indonesia",
+    "cs": "🇨🇿 Čeština", "da": "🇩🇰 Dansk",
+    "fi": "🇫🇮 Suomi", "hu": "🇭🇺 Magyar",
+    "ro": "🇷🇴 Română", "sv": "🇸🇪 Svenska",
+    "tr": "🇹🇷 Türkçe", "uk": "🇺🇦 Українська",
+    "ar": "🇸🇦 العربية", "vi": "🇻🇳 Tiếng Việt",
+    "hi": "🇮🇳 हिन्दी", "ms": "🇲🇾 Bahasa Melayu",
+    "fa": "🇮🇷 فارسی", "uz": "🇺🇿 Oʻzbekcha",
+}
 CURRENT_LANGUAGE = ContextVar("groupguard_language", default="zh-CN")
 
 
 def normalize_locale(value):
     code = str(value or "").replace("_", "-").lower()
-    return "en" if code.startswith("en") else "zh-CN"
+    base = code.split("-", 1)[0]
+    base = {"in": "id"}.get(base, base)
+    return base if base in LOCALES else "zh-CN"
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=32)
 def catalog(locale):
-    if locale == "zh-CN":
+    if locale == "zh-CN" or locale not in LOCALES:
         return {}
     return json.loads((Path(__file__).with_name("locales") / f"{locale}.json").read_text(encoding="utf-8"))
 

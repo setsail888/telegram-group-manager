@@ -119,16 +119,26 @@ if __name__ == "__main__":
     (target / "sources.json").write_text(json.dumps(sources, ensure_ascii=False, indent=2)+"\n", encoding="utf-8", newline="\n")
     print(f"{len(sources)} translation templates")
     if "--check" in sys.argv:
-        translated = json.loads((target / "en.json").read_text(encoding="utf-8"))
-        missing = set(sources)-set(translated)
-        if missing:
-            print("Missing translations:", len(missing))
-            for source in sorted(missing):
-                print(repr(source))
-            raise SystemExit(1)
-        invalid = [source for source in sources if placeholders(source) != placeholders(translated[source])]
-        if invalid:
-            for source in invalid:
-                print("Placeholder mismatch:", repr(source), repr(translated[source]))
-            raise SystemExit(1)
-        print("English catalog coverage and placeholders OK")
+        sys.path.insert(0, str(ROOT))
+        from app.i18n import LOCALES
+        for locale in LOCALES:
+            if locale == "zh-CN":
+                continue
+            path = target / f"{locale}.json"
+            if not path.is_file():
+                raise SystemExit(f"Missing locale catalog: {locale}")
+            translated = json.loads(path.read_text(encoding="utf-8"))
+            missing = set(sources)-set(translated)
+            if missing:
+                print(locale, "Missing translations:", len(missing))
+                for source in sorted(missing):
+                    print(repr(source))
+                raise SystemExit(1)
+            invalid = [source for source in sources if not isinstance(translated[source], str)
+                       or not translated[source].strip()
+                       or placeholders(source) != placeholders(translated[source])]
+            if invalid:
+                for source in invalid:
+                    print(locale, "Empty translation or placeholder mismatch:", repr(source), repr(translated[source]))
+                raise SystemExit(1)
+            print(locale, "catalog coverage and placeholders OK")

@@ -245,7 +245,7 @@
   ],
   "词条需为2–80字。": [
     "app/admin_ui.py:271",
-    "app/store.py:640"
+    "app/store.py:641"
   ],
   "请提供1–80个有效域名，整批尚未保存。": [
     "app/admin_ui.py:277"
@@ -1406,11 +1406,11 @@
   ],
   "📖 群规": [
     "app/member_ui.py:144",
-    "app/feature_help.py:509"
+    "app/feature_help.py:511"
   ],
   "🆔 我的ID": [
     "app/member_ui.py:144",
-    "app/feature_help.py:510"
+    "app/feature_help.py:512"
   ],
   "当前不是群成员或验证未完成。": [
     "app/member_ui.py:39"
@@ -1424,8 +1424,8 @@
   "未知功能说明，请重新打开功能页。": [
     "app/member_ui.py:59",
     "app/service.py:836",
-    "app/feature_help.py:492",
-    "app/feature_help.py:500"
+    "app/feature_help.py:494",
+    "app/feature_help.py:502"
   ],
   "📖 群规\n": [
     "app/member_ui.py:63"
@@ -1568,7 +1568,7 @@
   ],
   "🎉 免费抽奖": [
     "app/service.py:47",
-    "app/feature_help.py:508"
+    "app/feature_help.py:510"
   ],
   "🔗 链接管理": [
     "app/service.py:47"
@@ -1619,11 +1619,11 @@
   ],
   "🪙 积分签到": [
     "app/service.py:54",
-    "app/feature_help.py:506"
+    "app/feature_help.py:508"
   ],
   "🎁 积分商城": [
     "app/service.py:55",
-    "app/feature_help.py:507"
+    "app/feature_help.py:509"
   ],
   "📊 今日统计": [
     "app/service.py:55"
@@ -1655,7 +1655,7 @@
   "🔄 切换群组": [
     "app/service.py:60"
   ],
-  "🌐 群内提示语言": [
+  "🌐 语言 / Language": [
     "app/service.py:61"
   ],
   "短时刷屏": [
@@ -1886,7 +1886,8 @@
   ],
   "没有权限管理这个群组。": [
     "app/service.py:287",
-    "app/language_ui.py:40"
+    "app/language_ui.py:44",
+    "app/language_ui.py:71"
   ],
   "没有权限。": [
     "app/service.py:335",
@@ -1936,7 +1937,7 @@
   ],
   "请私聊机器人操作。": [
     "app/service.py:810",
-    "app/language_ui.py:26"
+    "app/language_ui.py:34"
   ],
   "未知或失效的按钮": [
     "app/service.py:821"
@@ -2692,7 +2693,7 @@
   ],
   "未知变体识别模式。": [
     "app/word_ui.py:116",
-    "app/store.py:610"
+    "app/store.py:611"
   ],
   "未知变体组合。": [
     "app/word_ui.py:121"
@@ -2711,7 +2712,7 @@
   ],
   "未知词库分类或模式。": [
     "app/word_ui.py:130",
-    "app/store.py:625"
+    "app/store.py:626"
   ],
   "未知组合。": [
     "app/word_ui.py:135"
@@ -2780,172 +2781,173 @@
     "app/store.py:21"
   ],
   "未知界面语言。": [
-    "app/store.py:393"
+    "app/store.py:394",
+    "app/language_ui.py:46"
   ],
   "该群尚未加入机器人": [
-    "app/store.py:395",
-    "app/store.py:406"
+    "app/store.py:396",
+    "app/store.py:407"
   ],
   "未知设置": [
-    "app/store.py:421"
+    "app/store.py:422"
   ],
   "开关必须是布尔值": [
-    "app/store.py:424"
+    "app/store.py:425"
   ],
   "文本最多 1500 字": [
-    "app/store.py:426"
+    "app/store.py:427"
   ],
   "日志目标 ID 必须是负整数或 0": [
-    "app/store.py:428"
+    "app/store.py:429"
   ],
   "验证时限为 60-1800 秒": [
-    "app/store.py:430"
+    "app/store.py:431"
   ],
   "签到基础积分需要在 1 到 100 之间": [
-    "app/store.py:433"
+    "app/store.py:434"
   ],
   "相同图片触发次数需要在 2 到 10 次之间": [
-    "app/store.py:436"
+    "app/store.py:437"
   ],
   "图片检测时间需要在 30 到 600 秒之间": [
-    "app/store.py:439"
+    "app/store.py:440"
   ],
   "OCR 模式只能是 off、review、delete": [
-    "app/store.py:441"
+    "app/store.py:442"
   ],
   "OCR 信心阈值范围为 40–95": [
-    "app/store.py:444"
+    "app/store.py:445"
   ],
   "违禁词处罚只能为 delete 或 mute": [
-    "app/store.py:446"
+    "app/store.py:447"
   ],
   "变体识别模式只能为 off、observe、enforce": [
-    "app/store.py:448"
+    "app/store.py:449"
   ],
   "未知防刷屏处罚方式": [
-    "app/store.py:450"
+    "app/store.py:451"
   ],
   "跨账号检测模式只能为 off、observe、enforce": [
-    "app/store.py:452"
+    "app/store.py:453"
   ],
   "违禁词删除提醒只能为 0、10、30、60 秒": [
-    "app/store.py:455"
+    "app/store.py:456"
   ],
   "防刷屏删除提醒只能为 0、10、30、60 秒": [
-    "app/store.py:458"
+    "app/store.py:459"
   ],
   "未知类型": [
-    "app/store.py:472"
+    "app/store.py:473"
   ],
   "未知规则类型": [
-    "app/store.py:498"
+    "app/store.py:499"
   ],
   "只支持查看当前群的违禁词列表": [
-    "app/store.py:506"
+    "app/store.py:507"
   ],
   "列表页码无效": [
-    "app/store.py:508"
+    "app/store.py:509"
   ],
   "仅支持批量导入违禁词、域名或例外短语": [
-    "app/store.py:540"
+    "app/store.py:541"
   ],
   "一次最多提交 80 条规则": [
-    "app/store.py:542"
+    "app/store.py:543"
   ],
   "未知防刷屏设置。": [
-    "app/store.py:591"
+    "app/store.py:592"
   ],
   "导入词条或匹配方式无效。": [
-    "app/store.py:656"
+    "app/store.py:657"
   ],
   "未知关键词匹配方式": [
-    "app/store.py:701",
+    "app/store.py:702",
     "app/moderation.py:50"
   ],
   "搜索词需为1–80字": [
-    "app/store.py:721"
+    "app/store.py:722"
   ],
   "未知群组": [
-    "app/store.py:741"
+    "app/store.py:742"
   ],
   "不支持的媒体类型": [
-    "app/store.py:773"
+    "app/store.py:774"
   ],
   "Telegram 文件 ID 无效": [
-    "app/store.py:775"
+    "app/store.py:776"
   ],
   "按钮格式无效": [
-    "app/store.py:777"
+    "app/store.py:778"
   ],
   "最多允许 3 个链接按钮": [
-    "app/store.py:782"
+    "app/store.py:783"
   ],
   "最多 100 条自动回复": [
-    "app/store.py:788"
+    "app/store.py:789"
   ],
   "未知审核状态": [
-    "app/store.py:847"
+    "app/store.py:848"
   ],
   "统计范围仅允许 1-31 天": [
-    "app/store.py:905"
+    "app/store.py:906"
   ],
   "排行榜范围无效": [
-    "app/store.py:924"
+    "app/store.py:925"
   ],
   "群组尚未登记": [
-    "app/store.py:943"
+    "app/store.py:944"
   ],
   "不支持的定时类型": [
-    "app/store.py:945"
+    "app/store.py:946"
   ],
   "标题最多 60 字，内容最多 3500 字，均不能为空": [
-    "app/store.py:947"
+    "app/store.py:948"
   ],
   "单群最多保存 20 条定时消息，可先删除旧任务": [
-    "app/store.py:952"
+    "app/store.py:953"
   ],
   "本群尚未开启签到积分": [
-    "app/store.py:1058"
+    "app/store.py:1059"
   ],
   "单次调整必须在 1 到 10000 积分之间": [
-    "app/store.py:1099"
+    "app/store.py:1100"
   ],
   "未命名群组": [
     "app/store.py:371"
   ],
   "{p0} 的设置范围为 {p1}–{p2}": [
-    "app/store.py:462"
+    "app/store.py:463"
   ],
   "域名规则最多 300 条": [
-    "app/store.py:480"
+    "app/store.py:481"
   ],
   "防刷屏设置已变化，请重新预览。": [
-    "app/store.py:596"
+    "app/store.py:597"
   ],
   "词库或变体设置已变化，请重新预览。": [
-    "app/store.py:615"
+    "app/store.py:616"
   ],
   "词库已被修改，请重新预览。": [
-    "app/store.py:629",
-    "app/store.py:644"
+    "app/store.py:630",
+    "app/store.py:645"
   ],
   "词库已被修改，请重新导入预览。": [
-    "app/store.py:660"
+    "app/store.py:661"
   ],
   "关键词已被修改或删除，请重新查看。": [
-    "app/store.py:706"
+    "app/store.py:707"
   ],
   "恢复定时任务时必须重算下次发送时间": [
-    "app/store.py:983"
+    "app/store.py:984"
   ],
   "积分已达上限": [
-    "app/store.py:1074"
+    "app/store.py:1075"
   ],
   "调整失败：积分不能为负数，也不能超过上限": [
-    "app/store.py:1110"
+    "app/store.py:1111"
   ],
   "超过每群域名 300 条上限，本次没有导入任何规则": [
-    "app/store.py:551"
+    "app/store.py:552"
   ],
   "免费抽奖标题必须是 2–100 字": [
     "app/raffle.py:34"
@@ -3227,34 +3229,35 @@
   "伪装链接": [
     "app/moderation.py:325"
   ],
-  "本群系统提示": [
-    "app/language_ui.py:17"
+  "💬 群内提示语言\n当前：{p0}\n只改变本群系统提示、验证与命令回复。控制面板仍使用你自己的界面语言。自定义内容保留原文。": [
+    "app/language_ui.py:24"
   ],
-  "我的私聊界面": [
-    "app/language_ui.py:17"
-  ],
-  "🌐 界面语言 / Language\n范围：{p0}\n当前：{p1}\n个人语言与群内语言分别保存。自定义欢迎语、群规、公告和关键词原文不会被翻译。": [
-    "app/language_ui.py:18"
+  "🌐 选择控制面板语言 / Select your language\n当前：{p0}\n选择后立即切换你的管理面板、功能说明和成员服务。其他管理员和群内提示的语言保持各自设置。": [
+    "app/language_ui.py:26"
   ],
   "📖 功能说明": [
-    "app/language_ui.py:15",
-    "app/feature_help.py:471",
-    "app/feature_help.py:475"
+    "app/language_ui.py:20",
+    "app/feature_help.py:473",
+    "app/feature_help.py:477"
   ],
   "⬅️ 返回": [
-    "app/language_ui.py:16"
+    "app/language_ui.py:22"
   ],
   "✅ 语言已保存。": [
-    "app/language_ui.py:53"
+    "app/language_ui.py:84",
+    "app/language_ui.py:57"
   ],
   "语言设置失败，请检查权限或重新打开菜单。": [
-    "app/language_ui.py:56"
+    "app/language_ui.py:87"
+  ],
+  "💬 单独设置群内提示语言": [
+    "app/language_ui.py:18"
   ],
   "未知语言操作。": [
-    "app/language_ui.py:37"
+    "app/language_ui.py:68"
   ],
   "只能修改自己的私聊语言。": [
-    "app/language_ui.py:42"
+    "app/language_ui.py:73"
   ],
   "打开群组管理面板": [
     "app/command_menu.py:5"
@@ -3415,35 +3418,35 @@
   "📖 免费抽奖 · 功能说明\n\n• 创建：开放本群报名，每群同一时间仅一个开放活动，不自动报名所有人。\n• 报名：当前已验证成员一人一份，重复点击不增加机会，不扣积分。\n• 开奖：管理员确认后，从有效报名中随机选1名，保存结果并尝试发公告。\n• 取消：结束当前活动，不产生中奖者。\n• 历史：查看保存的结果，不重新开奖。\n\n不要求积分或商城开启，没有定时自动开奖，奖励需管理员兑现。开奖前复核在群与验证状态，没有参与者不能开奖；公告发送失败时结果仍保存，先查历史再判断是否完成。": [
     "app/feature_help.py:361"
   ],
-  "📖 界面语言 · 功能说明\n\n目前支持简体中文和English，两类设置分别保存：\n• 个人语言：改变本人私聊管理页、成员服务和系统按钮，不改变其他人。\n• 群内提示语言：改变选中群的系统提示、验证和命令回复，需该群管理员权限。\n\n例如个人English、群中文时，你的私聊按钮英文，群里验证仍中文。自定义欢迎语、群规、公告、自动回复、奖励、关键词和昵称保留原文，不自动翻译。\n\n切换不改变防护规则、积分或时区；不是语音识别、群聊翻译。重启后保留，命令名称不变；服务器gg菜单与在线文档仍为中文。": [
+  "📖 界面语言 · 功能说明\n\n目前支持中文、English及法语、德语、西班牙语、俄语等共26种界面语言，两类设置分别保存：\n• 个人语言：改变本人私聊管理页、成员服务和系统按钮，不改变其他人。\n• 群内提示语言：改变选中群的系统提示、验证和命令回复，需该群管理员权限。\n\n在群控制面板点击“语言 / Language”，选择后立即切换并返回当前群面板；“单独设置群内提示语言”另行修改群内提示。\n\n例如个人English、群中文时，你的私聊按钮英文，群里验证仍中文。自定义欢迎语、群规、公告、自动回复、奖励、关键词和昵称保留原文，不自动翻译。\n\n切换不改变防护规则、积分或时区；不是语音识别、群聊翻译。重启后保留，命令名称不变；服务器gg菜单与在线文档仍为中文。": [
     "app/feature_help.py:370"
   ],
   "📖 命令指南 · 功能说明\n\n查询本项目已实现的群内命令，查看用法不会执行命令。多数管理操作也可在私聊选择群组后按按钮完成。\n\n普通成员使用/menu进入成员服务；管理员使用/panel或私聊/start配置群组。群设置、余额、订单和活动分别按群保存。\n\n成员管理需要数字ID和权限核验；部分命令会直接操作，例如/buy直接扣分兑换。需要先预览确认时，优先使用对应按钮。\n\n每个功能页的“功能说明”可查看用途、触发条件和开关关系，在线详细文档提供完整步骤。": [
-    "app/feature_help.py:379"
+    "app/feature_help.py:381"
   ],
   "📖 成员服务 · 功能说明\n\n• 签到：管理员开启积分后，每自然日领取一次本群积分。\n• 积分/排行：查看本群余额与积分排名，不是聊天活跃排行。\n• 商城：看奖励、预览后确认兑换；需积分开启、余额和库存足够。\n• 订单：查看本人最近20笔兑换记录与状态。\n• 抽奖：查看活动后另点报名，免费，不要求积分开启。\n• 群规/我的ID：查看本群规则和数字ID。\n\n每次点击核验在群和验证状态；不同群余额、订单及报名独立。这里不会代替管理员开启积分、上架奖励或创建活动。转赠在群内回复对方/transfer 数量，再本人确认。": [
-    "app/feature_help.py:388"
+    "app/feature_help.py:390"
   ],
   "📖 我的签到与积分 · 功能说明\n\n管理员开启积分后，每自然日可签到一次，当前基础奖励{checkin_award}分，连续签到最多额外6分；当天重复点击不再加分，断签后重算连续天数。\n\n积分和排名只属于当前群，不按聊天次数自动奖励；关闭积分保留余额，私聊仍可查询。奖励可用于本群管理员上架的虚拟项目，没有现金提现。\n\n转赠请在群里回复接收者消息发送/transfer 数量，单次最多1000分。只有发起者能确认，5分钟内有效，确认前不扣分；不能给自己、机器人或其他群的人转赠。\n\n阅读说明不会替你签到、转赠或扣分；返回积分页面只查询余额。": [
-    "app/feature_help.py:398"
+    "app/feature_help.py:400"
   ],
   "📖 成员商城与订单 · 功能说明\n\n选择奖励先看价格、说明和扣分预览，点击“确认扣分兑换”才扣积分、减库存并生成待核销订单；预览5分钟有效，过期或库存变化需重新查看。\n\n例如余额100分、单价30分，确认后余额70分；等待管理员人工发奖，核销不再扣分。待核销时管理员退款可恢复原扣积分，已核销订单不能重复退款。\n\n库存0表示售罄；管理员未开积分、余额不足、奖励下架时不能兑换。订单页仅显示本人最近20笔，不自动发货。群内/buy编号直接兑换；需要确认请使用按钮。\n\n阅读说明不会下单或扣分，返回商城后重新选择奖励。": [
-    "app/feature_help.py:407"
+    "app/feature_help.py:409"
   ],
   "📖 成员免费抽奖 · 功能说明\n\n先查看当前活动，再点击免费报名才算参与；重复报名仍只有一份机会，不扣积分，不要求积分功能开启。\n\n需要仍在本群且完成新人验证；离群会移除开放活动中的报名，开奖前也会复核。管理员手动随机选1名获胜者并兑现奖励，不是定时自动开奖或自动发奖。\n\n没有活动时请联系管理员创建。阅读说明或返回活动只查看，不替你报名；查看活动也不代表已经报名。": [
-    "app/feature_help.py:416"
+    "app/feature_help.py:418"
   ],
   "📖 群规 · 功能说明\n\n展示管理员为当前群保存的规则，也可在群内用/rules查询。关闭欢迎消息不影响群规查询。\n\n群规是供成员阅读的文字，不会自动变成机器人的关键词、链接或处罚条件；实际防护由管理员分别配置。\n\n自定义群规保留原文，不随个人语言自动翻译。不同群的群规独立，发现内容需要修改时联系管理员。": [
-    "app/feature_help.py:423"
+    "app/feature_help.py:425"
   ],
   "📖 我的ID · 功能说明\n\n查看自己的数字用户ID和当前选择的群ID。数字ID与可更改的@用户名不同，管理员手动管理、积分调整等通常需要数字ID。\n\n本页面只查询，不更改身份、昵称、积分或管理权限。私聊/id也可查看本人ID；目标成员ID需管理员在群内回复对方消息发送/id。\n\n不同群使用同一个Telegram用户ID，但群ID、群配置和积分余额分别保存。": [
-    "app/feature_help.py:430"
+    "app/feature_help.py:432"
   ],
   "🌐 在线详细文档": [
-    "app/feature_help.py:486"
+    "app/feature_help.py:488"
   ],
   "⬅️ 返回本功能": [
-    "app/feature_help.py:487"
+    "app/feature_help.py:489"
   ],
   "刷单返佣与任务骗局": [
     "app/wordlists/curated.json:task_scam:name"

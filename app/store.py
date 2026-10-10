@@ -381,8 +381,9 @@ class Store:
         return dict(row) if row else None
 
     def ui_language(self, owner_id):
+        from .i18n import LOCALES
         row = self.db.execute("SELECT locale FROM ui_languages WHERE owner_id=?", (int(owner_id),)).fetchone()
-        return row[0] if row and row[0] in ("zh-CN", "en") else "zh-CN"
+        return row[0] if row and row[0] in LOCALES else "zh-CN"
 
     def has_ui_language(self, owner_id):
         return self.db.execute("SELECT 1 FROM ui_languages WHERE owner_id=?", (int(owner_id),)).fetchone() is not None

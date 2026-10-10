@@ -58,7 +58,7 @@ MENU_MODULES = (
     (_ui('🔍 防护记录'), "audit"), (_ui('👮 成员管理'), "manage"),
     (_ui('🚨 集中入群防护'), "raid"), (_ui('🔐 权限检查'), "permissions"),
     (_ui('🧾 管理日志'), "logs"), (_ui('🔄 切换群组'), "groups"),
-    (_ui('🌐 群内提示语言'), "language"),
+    (_ui('🌐 语言 / Language'), "language"),
 )
 PAGE_SWITCHES = {
     "spam": ((_ui('🛡️ 智能反垃圾'), "spam_guard_enabled"),
@@ -358,7 +358,7 @@ class GroupBot:
         if not verified_admin and not self.is_admin(chat_id, user_id):
             return self._edit_or_send(user_id, message_id, _ui('没有权限。'))
         if what == "language":
-            return self.language_ui.page(user_id, cid=chat_id, mid=message_id)
+            return self.language_ui.page(user_id, panel_cid=chat_id, mid=message_id)
         keyboard = []
         conf = self.store.settings(chat_id)
         # The keyword page has its own compact button layout, matching the
