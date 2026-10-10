@@ -15,7 +15,7 @@ from .api import TelegramAPIError
 from .economy import Economy
 from .raffle import Raffles
 from .moderation import FloodGuard, PhotoRepeatGuard, evaluate, normalize, message_word_hit
-from .ocr import OCRWorker, MAX_OCR_FILE_BYTES, matched_words
+from .ocr import OCRWorker, MAX_OCR_FILE_BYTES, matched_words, OCR_MODES, OCR_SETUP_HINT
 from .scheduler import format_run, next_occurrence
 from .store import TOGGLES, NUMBER_LIMITS
 from .admin_ui import AdminUI
@@ -558,8 +558,12 @@ class GroupBot:
         elif what == "ocr":
             settings = self.store.settings(chat_id)
             text = (
-                _ui('🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 审核日志（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。', p0=settings['ocr_mode'], p1=_ui('已安装并启用') if self.ocr.available else _ui('未启用/未安装'), p2=settings['ocr_confidence'])
+                _ui('🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。', p0=OCR_MODES[settings['ocr_mode']], p1=_ui('已安装并启用') if self.ocr.available else _ui('未启用/未安装'), p2=settings['ocr_confidence'])
             )
+            if not self.ocr.available:
+                text += '\n\n'+OCR_SETUP_HINT
+            if not settings["word_filter_enabled"]:
+                text += _ui('\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。')
         elif what == "stats7":
             data = self.store.stats_days(chat_id, 7)
             text = (_ui('📈 最近7天（包含今天）\n消息 {p0} 条\n删除 {p1} 条\n入群 {p2} 人\n处罚 {p3} 次', p0=data.get('messages', 0), p1=data.get('deleted', 0), p2=data.get('joins', 0), p3=data.get('actions', 0)))

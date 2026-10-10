@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Penipuan dan spam bahasa Inggeris",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Frasa permintaan bahasa Inggeris. Mulakan dengan mod pemerhatian dalam kumpulan kewangan, keselamatan dan anti-penipuan untuk mengelak daripada memadamkan petikan.",
   "两字短词（严格）": "Kata kunci dua aksara (ketat)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Memadankan kata kunci dua aksara di mana-mana sahaja dalam mesej, termasuk amaran penipuan, berita dan petikan pendidikan. Dilumpuhkan secara lalai; amati dulu. Dayakan pengesanan varian secara berasingan untuk homofon dan aksara berpecah."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Memadankan kata kunci dua aksara di mana-mana sahaja dalam mesej, termasuk amaran penipuan, berita dan petikan pendidikan. Dilumpuhkan secara lalai; amati dulu. Dayakan pengesanan varian secara berasingan untuk homofon dan aksara berpecah.",
+  "✅ 已保存：{p0}": "✅ Disimpan: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "OCR mod: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Selepas pengesahan, berhenti mengimbas teks foto dalam kumpulan ini.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "Enjin OCR tidak tersedia. Mod kumpulan tidak ditukar. Ikuti langkah persediaan pada halaman ini.",
+  "当前已是{p0}，无需重复保存。": "Sudah ditetapkan kepada {p0}; tiada perubahan diperlukan.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Rekod sepadan dalam rekod perlindungan tanpa memadamkan foto. Kumpulan log yang berasingan adalah pilihan.",
+  "自动删除可能误判，建议先使用仅审核。": "Pemadaman automatik mungkin menghasilkan positif palsu. Mulakan dengan Semakan sahaja.",
+  "OCR模式已变化，请返回功能页面重新选择。": "Mod OCR telah berubah. Kembali ke halaman ciri dan pilih semula.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR ditetapkan kepada {p0}. Semak hanya rekod padanan tanpa memadam. Jika kumpulan log dikonfigurasikan, laporan juga dihantar ke sana.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Teks foto OCR mod: {p0}\nEnjin: {p1}\nKeyakinan minimum: {p2}\nMengimbas foto Telegram ahli biasa menggunakan Tesseract tempatan.\nHanya padanan kata kunci sekurang-kurangnya 4 aksara direkodkan atau diproses; Kod QR tidak dikenali.\n\n/ocr review — semak sahaja, simpan rekod perlindungan (disyorkan)\n/ocr delete — pemadaman automatik pada keyakinan tinggi (risiko positif palsu)\n/ocr off — lumpuhkan; /ocrconfidence 70 — tetapkan keyakinan\nMemerlukan OCR_ENABLED=1 dan Tesseract dipasang dalam bekas.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Penapis kata kunci dimatikan. OCR semakan kata kunci dilumpuhkan pada masa ini.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "Enjin OCR dinyahdayakan atau tidak dipasang.\nJalankan gg ocr dalam terminal SSH pelayan anda, pilih 1 dan tunggu binaan dan bot dimulakan semula.\nKemudian kembali ke sini dan pilih Semak sahaja atau Pemadaman automatik. Memasang enjin tidak mendayakan OCR dalam kumpulan individu.",
+  "关闭（off）": "Mati (off)",
+  "仅审核（review）": "Semakan sahaja (review)",
+  "自动删除（delete）": "Pemadaman automatik (delete)"
 }

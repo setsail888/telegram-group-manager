@@ -8,8 +8,9 @@ from unittest.mock import patch
 
 from app.admin_ui import FORMS
 from app.economy import Economy
+from app.i18n import LOCALES, render
 from app.moderation import evaluate, FloodGuard
-from app.ocr import matched_words
+from app.ocr import matched_words, OCR_MODES
 from app.service import GroupBot, MENU_MODULES
 from app.store import Store, DEFAULTS
 from tests.test_service import FakeTelegramAPI
@@ -215,7 +216,8 @@ class WorkflowTests(unittest.TestCase):
 
     def test_ocr_modes_need_engine_and_delete_permission(self):
         self.click("ad:-1001:ocr:delete")
-        self.confirm()
+        self.assertNotIn(1, self.bot.admin_ui.drafts)
+        self.assertIn("gg ocr", self.edits()[-1]["text"])
         self.assertEqual(self.store.settings(-1001)["ocr_mode"],"off")
         self.bot.ocr.available = True
         self.click("ad:-1001:ocr:review")
@@ -225,6 +227,87 @@ class WorkflowTests(unittest.TestCase):
         with patch.object(self.bot,"bot_can",return_value=False):
             self.confirm()
         self.assertEqual(self.store.settings(-1001)["ocr_mode"],"review")
+
+    def test_ocr_current_off_is_explicit_and_does_not_offer_a_noop_confirmation(self):
+        self.click("v:-1001:ocr")
+        page = self.edits()[-1]
+        buttons = [b for row in page["reply_markup"]["inline_keyboard"] for b in row]
+        self.assertIn("OCR 模式：关闭（off）", page["text"])
+        self.assertEqual([b["text"] for b in buttons if b.get("callback_data") == "ad:-1001:ocr:off"], ["✅ 关闭（off）"])
+        self.click("ad:-1001:ocr:off")
+        self.assertNotIn(1, self.bot.admin_ui.drafts)
+        self.assertEqual(self.store.settings(-1001)["ocr_mode"], "off")
+        self.assertTrue(any("无需重复保存" in p.get("text", "") and p.get("show_alert")
+                            for method, p in self.api.calls if method == "answerCallbackQuery"))
+
+    def test_ocr_enable_without_engine_shows_setup_and_does_not_create_drafts(self):
+        for mode in ("review", "delete"):
+            self.api.calls.clear()
+            self.click(f"ad:-1001:ocr:{mode}")
+            self.assertNotIn(1, self.bot.admin_ui.drafts)
+            self.assertEqual(self.store.settings(-1001)["ocr_mode"], "off")
+            self.assertIn("gg ocr", self.edits()[-1]["text"])
+            self.assertIn("选择1", self.edits()[-1]["text"])
+            self.assertNotIn("确认后生效", self.edits()[-1]["text"])
+            self.assertTrue(any("未更改群模式" in p.get("text", "") and p.get("show_alert")
+                                for method, p in self.api.calls if method == "answerCallbackQuery"))
+
+    def test_ocr_confirmation_names_both_modes_and_refreshes_saved_selection(self):
+        self.bot.ocr.available = True
+        for mode, previous, target in (("review", "关闭（off）", "仅审核（review）"),
+                                        ("delete", "仅审核（review）", "自动删除（delete）"),
+                                        ("off", "自动删除（delete）", "关闭（off）")):
+            self.click(f"ad:-1001:ocr:{mode}")
+            self.assertIn(f"{previous} → {target}", self.edits()[-1]["text"])
+            draft = dict(self.bot.admin_ui.drafts[1])
+            self.confirm()
+            self.assertEqual(self.store.settings(-1001)["ocr_mode"], mode)
+            page = self.edits()[-1]
+            self.assertEqual(page["message_id"], draft["prompt_id"])
+            self.assertIn("OCR 模式："+target, page["text"])
+            buttons = [b for row in page["reply_markup"]["inline_keyboard"] for b in row]
+            self.assertEqual([b["text"] for b in buttons if b.get("callback_data") == f"ad:-1001:ocr:{mode}"], ["✅ "+target])
+
+    def test_ocr_confirmation_rechecks_engine_and_concurrent_mode_changes(self):
+        self.bot.ocr.available = True
+        self.click("ad:-1001:ocr:review")
+        self.bot.ocr.available = False
+        self.confirm()
+        self.assertEqual(self.store.settings(-1001)["ocr_mode"], "off")
+        self.bot.ocr.available = True
+        self.click("ad:-1001:ocr:review")
+        self.store.set(-1001, "ocr_mode", "delete")
+        self.confirm()
+        self.assertEqual(self.store.settings(-1001)["ocr_mode"], "delete")
+        self.assertTrue(any("OCR模式已变化" in p.get("text", "")
+                            for method, p in self.api.calls if method == "answerCallbackQuery"))
+
+    def test_ocr_can_be_disabled_after_server_engine_is_disabled(self):
+        self.store.set(-1001, "ocr_mode", "review")
+        self.click("ad:-1001:ocr:off")
+        self.confirm()
+        self.assertEqual(self.store.settings(-1001)["ocr_mode"], "off")
+        self.assertIn("关闭（off）", self.edits()[-1]["text"])
+        self.assertIn("gg ocr", self.edits()[-1]["text"])
+
+    def test_ocr_saved_mode_and_setup_command_in_every_interface_language(self):
+        for locale in LOCALES:
+            with self.subTest(locale=locale):
+                self.store.set_ui_language(1, locale)
+                self.store.set(-1001, "ocr_mode", "off")
+                self.bot.ocr.available = False
+                self.click("v:-1001:ocr")
+                self.assertIn("gg ocr", self.edits()[-1]["text"])
+                self.bot.ocr.available = True
+                self.click("ad:-1001:ocr:review")
+                self.confirm()
+                page = self.edits()[-1]
+                label = render(OCR_MODES["review"], locale)
+                self.assertIn(label, page["text"])
+                buttons = [b for row in page["reply_markup"]["inline_keyboard"] for b in row]
+                self.assertEqual([b["text"] for b in buttons if b.get("callback_data") == "ad:-1001:ocr:review"], ["✅ "+label])
+                self.assertEqual(self.store.settings(-1001)["ocr_mode"], "review")
+                self.assertLess(len(page["text"].encode("utf-16-le"))//2, 4000)
 
     def test_logs_require_both_admins_and_post_permission(self):
         self.form("log_chat_id","-1001")

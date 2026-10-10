@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Arnaques et spam en anglais",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Phrases de sollicitation en anglais. Commencez par le mode observation dans les groupes financiers, de sécurité et anti-arnaque pour éviter de supprimer les devis.",
   "两字短词（严格）": "Mots-clés à deux caractères (stricts)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Fait correspondre des mots-clés à deux caractères n'importe où dans un message, y compris les avertissements d'arnaque, les actualités et les citations éducatives. Désactivé par défaut ; observer d'abord. Activez la détection des variantes séparément pour les homophones et les caractères divisés."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Fait correspondre des mots-clés à deux caractères n'importe où dans un message, y compris les avertissements d'arnaque, les actualités et les citations éducatives. Désactivé par défaut ; observer d'abord. Activez la détection des variantes séparément pour les homophones et les caractères divisés.",
+  "✅ 已保存：{p0}": "✅ Enregistré : {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "Mode OCR : {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Après confirmation, arrêtez de numériser le texte de la photo dans ce groupe.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "Le moteur OCR n'est pas disponible. Le mode groupe n'a pas été modifié. Suivez les étapes de configuration sur cette page.",
+  "当前已是{p0}，无需重复保存。": "Déjà défini sur {p0} ; aucun changement n’est nécessaire.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Enregistre les correspondances dans les enregistrements de protection sans supprimer les photos. Un groupe de journaux distinct est facultatif.",
+  "自动删除可能误判，建议先使用仅审核。": "La suppression automatique peut produire des faux positifs. Commencez par Révision uniquement.",
+  "OCR模式已变化，请返回功能页面重新选择。": "Le mode OCR a changé. Revenez à la page des fonctionnalités et sélectionnez à nouveau.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR réglé sur {p0}. Examinez uniquement les enregistrements correspondants sans les supprimer. Si un groupe de journaux est configuré, des rapports y sont également envoyés.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Mode texte photo OCR : {p0}\nMoteur : {p1}\nConfiance minimale : {p2}\nScanne les photos Telegram des membres réguliers à l’aide du Tesseract local.\nSeules les correspondances de mots clés d'au moins 4 caractères sont enregistrées ou traitées ; Les codes QR ne sont pas reconnus.\n\n/ocr review — révision uniquement, sauvegarde des enregistrements de protection (recommandé)\n/ocr delete — suppression automatique avec un niveau de confiance élevé (risque de faux positif)\n/ocr off — désactiver ; /ocrconfidence 70 — définir la confiance\nNécessite OCR_ENABLED=1 et Tesseract installés dans le conteneur.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Le filtre par mots clés est désactivé. Les vérifications de mots clés OCR sont actuellement désactivées.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "Le moteur OCR est désactivé ou n'est pas installé.\nExécutez gg ocr dans le terminal SSH de votre serveur, choisissez 1 et attendez le redémarrage de la build et du bot.\nRevenez ensuite ici et sélectionnez Révision uniquement ou Suppression automatique. L'installation du moteur n'active pas OCR dans des groupes individuels.",
+  "关闭（off）": "Désactivé (off)",
+  "仅审核（review）": "Audit uniquement (review)",
+  "自动删除（delete）": "Suppression automatique (delete)"
 }

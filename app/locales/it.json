@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Truffe e spam in inglese",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Frasi di sollecitazione in inglese. Inizia con la modalità di osservazione nei gruppi finanza, sicurezza e antitruffa per evitare di cancellare i preventivi.",
   "两字短词（严格）": "Parole chiave di due caratteri (rigorose)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Corrisponde a parole chiave di due caratteri ovunque in un messaggio, inclusi avvisi di truffe, notizie e citazioni educative. Disabilitato per impostazione predefinita; osservare prima. Abilita il rilevamento delle varianti separatamente per omofoni e caratteri divisi."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Corrisponde a parole chiave di due caratteri ovunque in un messaggio, inclusi avvisi di truffe, notizie e citazioni educative. Disabilitato per impostazione predefinita; osservare prima. Abilita il rilevamento delle varianti separatamente per omofoni e caratteri divisi.",
+  "✅ 已保存：{p0}": "✅ Salvato: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "modalità OCR: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Dopo la conferma, interrompi la scansione del testo della foto in questo gruppo.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "Il motore OCR non è disponibile. La modalità del gruppo non è stata modificata. Segui i passaggi di configurazione in questa pagina.",
+  "当前已是{p0}，无需重复保存。": "Già impostato su {p0}; non è necessario alcun cambiamento.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Corrispondenze dei record nei record di protezione senza eliminare le foto. Un gruppo di log separato è facoltativo.",
+  "自动删除可能误判，建议先使用仅审核。": "La cancellazione automatica può produrre falsi positivi. Inizia solo con la revisione.",
+  "OCR模式已变化，请返回功能页面重新选择。": "La modalità OCR è cambiata. Torna alla pagina delle funzionalità e seleziona di nuovo.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR impostato su {p0}. Rivedi solo le corrispondenze dei record senza eliminarle. Se è configurato un gruppo di log, anche i report vengono inviati lì.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Modalità testo foto OCR: {p0}\nMotore: {p1}\nConfidenza minima: {p2}\nEsegue la scansione delle foto di Telegram dei membri regolari utilizzando Tesseract locale.\nVengono registrate o elaborate solo le corrispondenze di parole chiave di almeno 4 caratteri; i codici QR non vengono riconosciuti.\n\n/ocr review: solo revisione, salvataggio dei record di protezione (consigliato)\n/ocr delete: cancellazione automatica con confidenza elevata (rischio di falsi positivi)\n/ocr off — disabilita; /ocrconfidence 70 — imposta la fiducia\nRichiede OCR_ENABLED=1 e Tesseract installati nel contenitore.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Il filtro per parole chiave è disattivato. I controlli delle parole chiave OCR sono attualmente disabilitati.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "Il motore OCR è disabilitato o non installato.\nEsegui gg ocr nel terminale del tuo server SSH, scegli 1 e attendi il riavvio della build e del bot.\nQuindi torna qui e seleziona Solo revisione o Eliminazione automatica. L'installazione del motore non abilita OCR nei singoli gruppi.",
+  "关闭（off）": "Spento (off)",
+  "仅审核（review）": "Solo verifica (review)",
+  "自动删除（delete）": "Cancellazione automatica (delete)"
 }

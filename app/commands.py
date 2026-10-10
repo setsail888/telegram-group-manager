@@ -4,6 +4,7 @@ import re
 import time
 
 from .moderation import normalize, normalize_domain
+from .ocr import OCR_MODES, OCR_SETUP_HINT
 from .economy_commands import (
     MEMBER_COMMANDS as ECONOMY_MEMBER_COMMANDS,
     ADMIN_COMMANDS as ECONOMY_ADMIN_COMMANDS,
@@ -290,14 +291,14 @@ def handle_command(bot, message):
             if mode not in ("off", "review", "delete"):
                 raise ValueError(_ui('用法：/ocr off | review | delete'))
             if mode != "off" and not bot.ocr.available:
-                raise ValueError(
-                    _ui('OCR 引擎尚未启用。请配置 WITH_OCR=1、OCR_ENABLED=1 并构建容器。'))
-            if mode == "review" and not settings["log_chat_id"]:
-                raise ValueError(_ui('先建立独立管理日志群并执行 /setlog 目标群ID，才能启用 OCR review'))
+                raise ValueError(OCR_SETUP_HINT)
             if mode == "delete" and not bot.bot_can(chat_id, "can_delete_messages"):
                 raise ValueError(_ui('删除模式需要机器人拥有删除消息的管理员权限'))
             bot.store.set(chat_id, "ocr_mode", mode)
-            bot.send(chat_id, _ui('🔎 OCR 已设为 {p0}。review 仅记录到管理日志，不删除；delete 有误判风险。', p0=mode))
+            notice = _ui('🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。', p0=OCR_MODES[mode])
+            if mode == "delete":
+                notice += '\n'+_ui('自动删除可能误判，建议先使用仅审核。')
+            bot.send(chat_id, notice)
             bot.log(chat_id, _ui('OCR 模式修改为 {p0}', p0=mode), actor=user_id)
         elif command == "ocrconfidence":
             try:

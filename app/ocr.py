@@ -18,10 +18,17 @@ from threading import BoundedSemaphore
 from .api import TelegramAPIError
 from .moderation import normalize, word_waivers
 from .keyword_matcher import KeywordMatcher
+from .i18n import msg as _ui
 from functools import lru_cache
 
 LOG = logging.getLogger("groupguard.ocr")
 MAX_OCR_FILE_BYTES = 3_000_000
+OCR_MODES = {
+    "off": _ui("关闭（off）"),
+    "review": _ui("仅审核（review）"),
+    "delete": _ui("自动删除（delete）"),
+}
+OCR_SETUP_HINT = _ui("OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。")
 
 
 def extract_tesseract(data):

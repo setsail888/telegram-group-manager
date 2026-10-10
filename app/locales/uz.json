@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Inglizcha firibgarlik va spam",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Inglizcha so'rov iboralari. Kotirovkalarni o'chirib tashlamaslik uchun moliya, xavfsizlik va firibgarlikka qarshi guruhlarda kuzatish rejimidan boshlang.",
   "两字短词（严格）": "Ikki belgili kalit so'zlar (qat'iy)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Ikki belgili kalit soʻzlarga xabarning istalgan joyida, jumladan, firibgarlik haqida ogohlantirishlar, yangiliklar va taʼlimga oid iqtiboslarga mos keladi. Sukut bo'yicha o'chirilgan; birinchi navbatda kuzating. Omofonlar va belgilarni ajratish uchun variantni aniqlashni alohida yoqing."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Ikki belgili kalit soʻzlarga xabarning istalgan joyida, jumladan, firibgarlik haqida ogohlantirishlar, yangiliklar va taʼlimga oid iqtiboslarga mos keladi. Sukut bo'yicha o'chirilgan; birinchi navbatda kuzating. Omofonlar va belgilarni ajratish uchun variantni aniqlashni alohida yoqing.",
+  "✅ 已保存：{p0}": "✅ Saqlangan: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "OCR rejimi: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Tasdiqlangandan so'ng, ushbu guruhdagi fotosurat matnini skanerlashni to'xtating.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "OCR dvigateli mavjud emas. Guruh rejimi o'zgartirilmadi. Ushbu sahifadagi sozlash bosqichlarini bajaring.",
+  "当前已是{p0}，无需重复保存。": "{p0} ga allaqachon sozlangan; hech qanday o'zgartirish kerak emas.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Fotosuratlarni o'chirmasdan himoya yozuvlaridagi mosliklarni yozadi. Alohida jurnallar guruhi ixtiyoriy.",
+  "自动删除可能误判，建议先使用仅审核。": "Avtomatik o'chirish noto'g'ri ijobiy natijalarga olib kelishi mumkin. Faqat ko'rib chiqish bilan boshlang.",
+  "OCR模式已变化，请返回功能页面重新选择。": "OCR rejimi o'zgardi. Xususiyatlar sahifasiga qayting va yana tanlang.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR {p0} ga o‘rnatildi. Tekshirish faqat mos yozuvlarni o'chirmasdan yozadi. Agar jurnallar guruhi sozlangan bo'lsa, hisobotlar ham u erga yuboriladi.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Surat matni OCR rejimi: {p0}\nDvigatel: {p1}\nMinimal ishonch: {p2}\nMahalliy Tesseract yordamida oddiy a'zolarning Telegram suratlarini skanerlaydi.\nFaqat kamida 4 ta belgidan iborat kalit so'z mosligi yozib olinadi yoki qayta ishlanadi; QR kodlari tan olinmaydi.\n\n/ocr review — faqat koʻrib chiqish, himoya yozuvlarini saqlash (tavsiya etiladi)\n/ocr delete — yuqori ishonchlilikda avtomatik oʻchirish (notoʻgʻri-musbat xavf)\n/ocr off — o‘chirish; /ocrconfidence 70 - ishonchni o'rnating\nKonteynerga o'rnatilgan OCR_ENABLED=1 va Tesseract talab qilinadi.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Kalit soʻz filtri oʻchirilgan. OCR kalit soʻzlarni tekshirish hozirda oʻchirib qoʻyilgan.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "OCR dvigateli oʻchirilgan yoki oʻrnatilmagan.\nServeringizdagi SSH terminalida gg ocr-ni ishga tushiring, 1-ni tanlang va qurilish va botni qayta ishga tushirishni kuting.\nKeyin bu yerga qayting va Faqat ko‘rib chiqish yoki Avtomatik o‘chirish-ni tanlang. Dvigatelni o'rnatish alohida guruhlarda OCR ni yoqmaydi.",
+  "关闭（off）": "Oʻchirilgan (off)",
+  "仅审核（review）": "Faqat tekshirish (review)",
+  "自动删除（delete）": "Avtomatik o'chirish (delete)"
 }

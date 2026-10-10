@@ -13,6 +13,7 @@ from .reply_rules import parse_keywords, parse_buttons, media_from_reply
 from .scheduler import parse_rule, next_occurrence, format_run
 from .word_library import parse_import, IMPORT_BYTES, describe_hit
 from .membership import is_current_member
+from .ocr import OCR_MODES, OCR_SETUP_HINT
 from .flood_penalty import PENALTIES
 
 
@@ -342,8 +343,10 @@ class AdminUI:
         elif page == "logs":
             keyboard.append([add(_ui('✏️ 设置/关闭日志群'), "log_chat_id"), b(_ui('🔍 防护记录'), _ui('v:{p0}:audit', p0=cid))])
         elif page == "ocr":
-            keyboard.extend([[b(_ui('关闭'), _ui('ad:{p0}:ocr:off', p0=cid)), b(_ui('仅审核'), _ui('ad:{p0}:ocr:review', p0=cid))],
-                             [b(_ui('⚠️ 自动删除'), _ui('ad:{p0}:ocr:delete', p0=cid))]])
+            current = self.bot.store.settings(cid)["ocr_mode"]
+            buttons = [b(("✅ " if mode == current else "⚠️ " if mode == "delete" else "")+label,
+                         f"ad:{cid}:ocr:{mode}") for mode, label in OCR_MODES.items()]
+            keyboard.extend([buttons[:2], buttons[2:]])
             text += _ui('\n按钮可直接选择模式；仅审核会写入防护记录。精确例外同样用于 OCR。')
         elif page == "points":
             keyboard.append([add(_ui('➕ / ➖ 调整成员积分'), "point_adjust")])
@@ -485,6 +488,11 @@ class AdminUI:
                     raise ValueError(_ui('确认已失效，请重新打开操作。'))
                 self.cancel(uid)  # One attempt; never retry an uncertain Telegram side effect.
                 result = self.commit(uid, draft)
+                if draft["op"] == "ocr":
+                    bot.answer(qid, _ui('✅ 已保存：{p0}', p0=OCR_MODES[bot.store.settings(cid)["ocr_mode"]]))
+                    page = bot._private_view(uid, cid, "ocr", mid, verified_admin=True)
+                    bot.log(cid, _ui('按钮操作 {p0}', p0=draft['op']), actor=uid)
+                    return page
                 bot.answer(qid, _ui('✅ 操作完成'))
                 bot._edit_or_send(uid, mid, "✅ "+str(result), self.back(cid, draft["page"]))
                 bot.log(cid, _ui('按钮操作 {p0}', p0=draft['op']), actor=uid)
@@ -547,10 +555,22 @@ class AdminUI:
                 summary = (_ui('立即开始 {p0} 分钟额外新人验证。', p0=duration) if arg == "start" else
                            _ui('停止额外新人验证；已有验证题仍有效，常规新人验证开关不受影响。'))
             elif action == "ocr":
-                if arg not in ("off", "review", "delete"):
+                if arg not in OCR_MODES:
                     raise ValueError(_ui('无效OCR模式。'))
-                page, values = "ocr", {"mode": arg}
-                summary = _ui('OCR模式：{p0}。自动删除可能误判，建议先使用仅审核。', p0=arg)
+                if arg != "off" and not bot.ocr.available:
+                    bot.answer(qid, _ui('OCR引擎不可用，未更改群模式。请按页面步骤启用。'), alert=True)
+                    return bot._private_view(uid, cid, "ocr", mid, verified_admin=True)
+                current = bot.store.settings(cid)["ocr_mode"]
+                if arg == current:
+                    bot.answer(qid, _ui('当前已是{p0}，无需重复保存。', p0=OCR_MODES[current]), alert=True)
+                    return bot._private_view(uid, cid, "ocr", mid, verified_admin=True)
+                if arg == "delete" and not bot.bot_can(cid, "can_delete_messages"):
+                    raise ValueError(_ui('机器人缺少删除消息权限。'))
+                page, values = "ocr", {"mode": arg, "previous": current}
+                effect = (_ui('确认后停止本群图片文字扫描。') if arg == "off" else
+                          _ui('仅记录命中到防护记录，不删除图片；日志群为可选。') if arg == "review" else
+                          _ui('自动删除可能误判，建议先使用仅审核。'))
+                summary = _ui('OCR模式：{p0} → {p1}\n{p2}', p0=OCR_MODES[current], p1=OCR_MODES[arg], p2=effect)
             elif action in ("domain", "reply"):
                 page = "domains" if action == "domain" else "replies"
                 rows = bot.store.filters(cid, "domain") if action == "domain" else bot.store.replies(cid)
@@ -658,9 +678,11 @@ class AdminUI:
             bot.raffles.cancel(cid,uid)
         elif op == "ocr":
             if v["mode"] != "off" and not bot.ocr.available:
-                raise ValueError(_ui('OCR引擎未启用。需配置 WITH_OCR=1、OCR_ENABLED=1 并构建容器。'))
+                raise ValueError(OCR_SETUP_HINT)
             if v["mode"]=="delete" and not bot.bot_can(cid,"can_delete_messages"):
                 raise ValueError(_ui('机器人缺少删除消息权限。'))
+            if store.settings(cid)["ocr_mode"] != v["previous"]:
+                raise ValueError(_ui('OCR模式已变化，请返回功能页面重新选择。'))
             store.set(cid,"ocr_mode",v["mode"])
         elif op == "point_adjust":
             person = bot.api.safe("getChatMember",chat_id=cid,user_id=v["target"])

@@ -122,6 +122,19 @@ class OCRServiceTests(unittest.TestCase):
                             "加微信联系" in p.get("text", "") and p.get("chat_id") == -1001
                             for method, p in self.api.calls))
 
+    def test_review_command_without_log_group_records_hits_without_deleting(self):
+        self.bot.handle_update({"message": {
+            "message_id": 100, "from": {"id": 1}, "text": "/ocr review",
+            "chat": {"id": -1001, "type": "supergroup", "title": "测试群"}}})
+        self.assertEqual(self.store.settings(-1001)["ocr_mode"], "review")
+        self.assertEqual(self.store.settings(-1001)["log_chat_id"], 0)
+        self.bot.handle_update({"message": self.msg(2, 101)})
+        self.drain()
+        self.assertEqual(self.store.stats(-1001).get("ocr_hits"), 1)
+        self.assertFalse(any(method == "deleteMessage" for method, _ in self.api.calls))
+        records = self.store.audit_page(-1001)[0]
+        self.assertTrue(any(r["source"] == "ocr" and r["outcome"] == "observed" for r in records))
+
     def test_explicit_delete_mode_and_admin_exemption(self):
         self.store.set(-1001, "ocr_mode", "delete")
         self.bot.handle_update({"message": self.msg(1, 110)})

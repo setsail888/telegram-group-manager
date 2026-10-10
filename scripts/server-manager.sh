@@ -412,7 +412,7 @@ ocr_menu() {
       env_put WITH_OCR 1
       env_put OCR_ENABLED 1
       dc up -d --build groupbot
-      info "已安装可选 Tesseract 中文 OCR。接下来先设置独立日志群，再发送 /ocr review"
+      info "已安装可选 Tesseract 中文 OCR。接下来在机器人图片 OCR 页选择仅审核，或发送 /ocr review；日志群为可选"
       warn "OCR 仅识别文字关键词；图片误判与漏判都可能发生"
       ;;
     2)

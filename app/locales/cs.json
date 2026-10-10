@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Anglické podvody a spam",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Anglické prosební fráze. Začněte s režimem pozorování ve finančních, bezpečnostních a anti-scam skupinách, abyste se vyhnuli mazání nabídek.",
   "两字短词（严格）": "Klíčová slova o dvou znacích (přísné)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Odpovídá dvouznakovým klíčovým slovům kdekoli ve zprávě, včetně upozornění na podvod, zpráv a vzdělávacích citací. Ve výchozím nastavení zakázáno; nejprve pozorovat. Povolit detekci variant samostatně pro homofony a rozdělené znaky."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Odpovídá dvouznakovým klíčovým slovům kdekoli ve zprávě, včetně upozornění na podvod, zpráv a vzdělávacích citací. Ve výchozím nastavení zakázáno; nejprve pozorovat. Povolit detekci variant samostatně pro homofony a rozdělené znaky.",
+  "✅ 已保存：{p0}": "✅ Uloženo: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "Režim OCR: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Po potvrzení zastavte skenování textu fotografie v této skupině.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "Motor OCR není k dispozici. Skupinový režim se nezměnil. Postupujte podle kroků nastavení na této stránce.",
+  "当前已是{p0}，无需重复保存。": "Již nastaveno na {p0}; není potřeba žádná změna.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Zaznamenává shody v záznamech ochrany bez mazání fotografií. Samostatná skupina protokolů je volitelná.",
+  "自动删除可能误判，建议先使用仅审核。": "Automatické mazání může vést k falešným poplachům. Začněte pouze s recenzí.",
+  "OCR模式已变化，请返回功能页面重新选择。": "Režim OCR se změnil. Vraťte se na stránku funkcí a vyberte znovu.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR nastaveno na {p0}. Kontrola zaznamená pouze shody bez mazání. Pokud je nakonfigurována skupina protokolů, zprávy se odesílají také tam.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Text fotografie OCR režim: {p0}\nMotor: {p1}\nMinimální spolehlivost: {p2}\nSkenuje fotografie telegramu pravidelných členů pomocí místního Tesseractu.\nZaznamenávají se nebo zpracovávají pouze shody klíčových slov o délce alespoň 4 znaků; Kódy QR nebyly rozpoznány.\n\n/ocr review — pouze zkontrolovat, uložit záznamy ochrany (doporučeno)\n/ocr delete — automatické mazání s vysokou spolehlivostí (falešně pozitivní riziko)\n/ocr off — zakázat; /ocrconfidence 70 — nastavte spolehlivost\nVyžaduje OCR_ENABLED=1 a Tesseract nainstalované v kontejneru.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Filtr klíčových slov je vypnutý. OCR kontroly klíčových slov jsou momentálně zakázány.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "Motor OCR je zakázán nebo není nainstalován.\nSpusťte gg ocr na svém serveru SSH terminálu, vyberte 1 a počkejte na sestavení a restart robota.\nPoté se vraťte sem a vyberte možnost Pouze prohlížet nebo Automatické mazání. Instalace motoru nepovolí OCR v jednotlivých skupinách.",
+  "关闭（off）": "Vypnuto (off)",
+  "仅审核（review）": "Pouze kontrola (review)",
+  "自动删除（delete）": "Automatické mazání (delete)"
 }

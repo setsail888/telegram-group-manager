@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Englanninkieliset huijaukset ja roskaposti",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Englanninkieliset tarjouslausekkeet. Aloita tarkkailutilasta rahoitus-, turvallisuus- ja huijaustentorjuntaryhmissä välttääksesi lainausten poistamisen.",
   "两字短词（严格）": "Kaksimerkkiset avainsanat (tiukat)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Vastaa kaksimerkkisiä avainsanoja missä tahansa viestissä, mukaan lukien huijausvaroitukset, uutiset ja opetukselliset lainaukset. Ei käytössä oletuksena; tarkkaile ensin. Ota variantin tunnistus käyttöön erikseen homofoneille ja jaetuille hahmoille."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Vastaa kaksimerkkisiä avainsanoja missä tahansa viestissä, mukaan lukien huijausvaroitukset, uutiset ja opetukselliset lainaukset. Ei käytössä oletuksena; tarkkaile ensin. Ota variantin tunnistus käyttöön erikseen homofoneille ja jaetuille hahmoille.",
+  "✅ 已保存：{p0}": "✅ Tallennettu: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "OCR tila: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Vahvistuksen jälkeen lopeta valokuvatekstin skannaus tässä ryhmässä.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "Moottori OCR ei ole käytettävissä. Ryhmätilaa ei muutettu. Noudata tällä sivulla olevia asennusvaiheita.",
+  "当前已是{p0}，无需重复保存。": "Jo asetettu arvoon {p0}; muutosta ei tarvita.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Tallentaa osumat suojatietueisiin poistamatta valokuvia. Erillinen lokiryhmä on valinnainen.",
+  "自动删除可能误判，建议先使用仅审核。": "Automaattinen poistaminen voi tuottaa vääriä positiivisia tuloksia. Aloita vain arvostelusta.",
+  "OCR模式已变化，请返回功能页面重新选择。": "OCR-tila on muuttunut. Palaa ominaisuussivulle ja valitse uudelleen.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR asetettu arvoon {p0}. Tarkista vain tietueiden osumat ilman poistamista. Jos lokiryhmä on määritetty, raportit lähetetään myös sinne.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Kuvateksti OCR tila: {p0}\nMoottori: {p1}\nVähimmäisluottamus: {p2}\nSkannaa tavallisten jäsenten Telegram-kuvat paikallisen Tesseractin avulla.\nVain vähintään neljän merkin avainsanaosumat tallennetaan tai käsitellään. QR koodeja ei tunnisteta.\n\n/ocr review - vain tarkastelu, tallenna suojaustiedot (suositus)\n/ocr delete — automaattinen poisto suurella varmuudella (väärä positiivinen riski)\n/ocr off — poista käytöstä; /ocrconfidence 70 — luo itseluottamusta\nVaatii OCR_ENABLED=1 ja Tesseract asennettuna säiliöön.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Avainsanasuodatin on pois päältä. OCR avainsanatarkistukset ovat tällä hetkellä poissa käytöstä.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "Moottori OCR on poistettu käytöstä tai sitä ei ole asennettu.\nSuorita gg ocr palvelimellasi SSH, valitse 1 ja odota koontiversion ja botin uudelleenkäynnistystä.\nPalaa sitten tähän ja valitse Vain tarkistus tai Automaattinen poisto. Moottorin asentaminen ei ota käyttöön OCR yksittäisissä ryhmissä.",
+  "关闭（off）": "Pois (off)",
+  "仅审核（review）": "Vain tarkistus (review)",
+  "自动删除（delete）": "Automaattinen poisto (delete)"
 }

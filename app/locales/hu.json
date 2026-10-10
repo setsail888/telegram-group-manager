@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Angol csalások és spam",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Angol megkeresési kifejezések. Kezdje a megfigyelési móddal a pénzügyi, biztonsági és átverés elleni csoportokban, hogy elkerülje az idézetek törlését.",
   "两字短词（严格）": "Két karakterből álló kulcsszavak (szigorú)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Kétkarakteres kulcsszavakhoz illeszkedik az üzenetben bárhol, beleértve az átverésre vonatkozó figyelmeztetéseket, híreket és oktatási idézeteket. Alapértelmezés szerint letiltva; először figyeld meg. Külön engedélyezze a változat-érzékelést a homofonok és a megosztott karakterek számára."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Kétkarakteres kulcsszavakhoz illeszkedik az üzenetben bárhol, beleértve az átverésre vonatkozó figyelmeztetéseket, híreket és oktatási idézeteket. Alapértelmezés szerint letiltva; először figyeld meg. Külön engedélyezze a változat-érzékelést a homofonok és a megosztott karakterek számára.",
+  "✅ 已保存：{p0}": "✅ Mentve: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "OCR mód: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "A megerősítést követően állítsa le a fotószöveg beolvasását ebben a csoportban.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "A OCR motor nem érhető el. A csoport mód nem változott. Kövesse az ezen az oldalon található beállítási lépéseket.",
+  "当前已是{p0}，无需重复保存。": "Már beállítva {p0}; nincs szükség változtatásra.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Rögzíti az egyezéseket a védelmi rekordokban a fényképek törlése nélkül. Külön naplócsoport nem kötelező.",
+  "自动删除可能误判，建议先使用仅审核。": "Az automatikus törlés hamis pozitív eredményeket produkálhat. Kezdje csak a felülvizsgálattal.",
+  "OCR模式已变化，请返回功能页面重新选择。": "A OCR mód megváltozott. Térjen vissza a szolgáltatás oldalára, és válassza ki újra.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR értéke {p0}. Csak az egyező rekordokat tekintse át törlés nélkül. Ha naplócsoport van konfigurálva, a jelentéseket is oda küldi.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Fotó szöveg OCR mód: {p0}\nMotor: {p1}\nMinimális megbízhatóság: {p2}\nSzkenneli a rendszeres tagok Telegram-fotóit a helyi Tesseract segítségével.\nCsak a legalább 4 karakterből álló kulcsszóegyezéseket rögzíti vagy dolgozza fel; A QR kódok nem ismerhetők fel.\n\n/ocr review – csak áttekintés, védelmi rekordok mentése (ajánlott)\n/ocr delete – automatikus törlés nagy megbízhatósággal (hamis pozitív kockázat)\n/ocr off — letiltása; /ocrconfidence 70 — állítsa be az önbizalmat\nA tárolóba telepített OCR_ENABLED=1 és Tesseract szükséges.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ A kulcsszószűrő ki van kapcsolva. A OCR kulcsszóellenőrzés jelenleg le van tiltva.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "A OCR motor le van tiltva vagy nincs telepítve.\nFuttassa a gg ocr programot a kiszolgáló SSH termináljában, válassza az 1-et, és várja meg, amíg a build és a bot újraindul.\nEzután térjen vissza ide, és válassza a Csak áttekintés vagy az Automatikus törlés lehetőséget. A motor telepítése nem teszi lehetővé a OCR használatát az egyes csoportokban.",
+  "关闭（off）": "Ki (off)",
+  "仅审核（review）": "Csak ellenőrzés (review)",
+  "自动删除（delete）": "Automatikus törlés (delete)"
 }

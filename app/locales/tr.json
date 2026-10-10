@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Dolandırıcılık ve spam",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "İngilizce rica ifadeleri. Tekliflerin silinmesini önlemek için finans, güvenlik ve dolandırıcılıkla mücadele gruplarında gözlem moduyla başlayın.",
   "两字短词（严格）": "İki karakterli anahtar kelimeler (katı)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Dolandırıcılık uyarıları, haberler ve eğitici alıntılar da dahil olmak üzere bir mesajın herhangi bir yerindeki iki karakterli anahtar kelimeleri eşleştirir. Varsayılan olarak devre dışıdır; önce gözlemleyin. Sesteş sözcükler ve bölünmüş karakterler için değişken algılamayı ayrı ayrı etkinleştirin."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Dolandırıcılık uyarıları, haberler ve eğitici alıntılar da dahil olmak üzere bir mesajın herhangi bir yerindeki iki karakterli anahtar kelimeleri eşleştirir. Varsayılan olarak devre dışıdır; önce gözlemleyin. Sesteş sözcükler ve bölünmüş karakterler için değişken algılamayı ayrı ayrı etkinleştirin.",
+  "✅ 已保存：{p0}": "✅ Kaydedildi: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "OCR modu: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Onaylandıktan sonra bu gruptaki fotoğraf metnini taramayı bırakın.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "OCR motoru kullanılamıyor. Grup modu değiştirilmedi. Bu sayfadaki kurulum adımlarını izleyin.",
+  "当前已是{p0}，无需重复保存。": "Zaten {p0} olarak ayarlandı; hiçbir değişikliğe gerek yoktur.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Eşleşmeleri fotoğrafları silmeden koruma kayıtlarına kaydeder. Ayrı bir günlük grubu isteğe bağlıdır.",
+  "自动删除可能误判，建议先使用仅审核。": "Otomatik silme hatalı pozitif sonuçlara yol açabilir. Yalnızca İnceleme ile başlayın.",
+  "OCR模式已变化，请返回功能页面重新选择。": "OCR modu değişti. Özellik sayfasına dönün ve tekrar seçin.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR, {p0} olarak ayarlandı. Silmeden yalnızca kayıt eşleşmelerini inceleyin. Bir günlük grubu yapılandırılmışsa raporlar da oraya gönderilir.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Fotoğraf metni OCR modu: {p0}\nMotor: {p1}\nMinimum güven: {p2}\nYerel Tesseract'ı kullanarak düzenli üyelerin Telegram fotoğraflarını tarar.\nYalnızca en az 4 karakterden oluşan anahtar kelime eşleşmeleri kaydedilir veya işlenir; QR kodları tanınmıyor.\n\n/ocr review — yalnızca inceleme, koruma kayıtlarını kaydetme (önerilir)\n/ocr delete — yüksek güvenle otomatik silme (yanlış pozitif risk)\n/ocr off — devre dışı bırak; /ocrconfidence 70 — güveni ayarla\nKapta OCR_ENABLED=1 ve Tesseract'ın kurulu olmasını gerektirir.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Anahtar kelime filtresi kapalı. OCR anahtar kelime kontrolleri şu anda devre dışı.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "OCR motoru devre dışı veya kurulu değil.\nSunucunuzun SSH terminalinde gg ocr komutunu çalıştırın, 1'i seçin ve derlemenin ve botun yeniden başlatılmasını bekleyin.\nDaha sonra buraya dönün ve Yalnızca inceleme veya Otomatik silme seçeneğini seçin. Motorun kurulması bireysel gruplarda OCR'yi etkinleştirmez.",
+  "关闭（off）": "Kapalı (off)",
+  "仅审核（review）": "Yalnızca incele (review)",
+  "自动删除（delete）": "Otomatik silme (delete)"
 }

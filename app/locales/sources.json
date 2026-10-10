@@ -1,740 +1,737 @@
 {
   "📝 关键词：{p0}\n当前匹配：{p1}\n\n包含：文字中出现即命中，遵循拆字匹配开关。\n整词：两侧不能紧邻字母、数字、下划线或汉字，适合英文短词；不进行中文分词。\n整句：整条文字与关键词相同才命中。\n均忽略大小写、全半角和零宽字符；整词、整句不使用拆字匹配。\n图片识别仍需满足OCR的置信度与至少4字限制。": [
-    "app/admin_ui.py:94"
+    "app/admin_ui.py:95"
   ],
   "🔎 操作预览\n群：{p0}（{p1}）\n{p2}\n\n确认后生效；十分钟内有效。": [
-    "app/admin_ui.py:141"
+    "app/admin_ui.py:142"
   ],
   "已保存，请返回功能页面查看。": [
-    "app/admin_ui.py:675"
+    "app/admin_ui.py:697"
   ],
   "成员 {p0} 操作已完成：{p1}。": [
-    "app/admin_ui.py:719"
+    "app/admin_ui.py:741"
   ],
   "🔎 搜索：{p0}\n共 {p1} 条 · 第 {p2}/{p3} 页\n点击条目设置匹配方式或删除。": [
-    "app/admin_ui.py:114"
+    "app/admin_ui.py:115"
   ],
   "🌐 域名白名单（包含子域名）": [
-    "app/admin_ui.py:394"
+    "app/admin_ui.py:397"
   ],
   "观察": [
-    "app/admin_ui.py:430"
+    "app/admin_ui.py:433"
   ],
   "已删": [
-    "app/admin_ui.py:430"
+    "app/admin_ui.py:433"
   ],
   "批量清理已提交": [
-    "app/admin_ui.py:430"
+    "app/admin_ui.py:433"
   ],
   "删除失败": [
-    "app/admin_ui.py:430"
+    "app/admin_ui.py:433"
   ],
   "已添加 {p0} 条域名白名单。": [
-    "app/admin_ui.py:608"
+    "app/admin_ui.py:628"
   ],
   "已清除警告。": [
-    "app/admin_ui.py:685"
+    "app/admin_ui.py:707"
   ],
   "发送禁言分钟数，整数1–525600（365天）；预览确认后只影响今后的处罚。": [
-    "app/admin_ui.py:20"
-  ],
-  "发送封禁分钟数，整数1–525600；0表示永久。预览确认后只影响今后的处罚。": [
     "app/admin_ui.py:21"
   ],
-  "发送UTF-8词库文件（单次最多1 MiB）或粘贴文字。每行一词；支持 匹配方式+Tab+词 或JSONL。总条数不限，可分批追加。已有词保持原规则。": [
+  "发送封禁分钟数，整数1–525600；0表示永久。预览确认后只影响今后的处罚。": [
     "app/admin_ui.py:22"
   ],
-  "发送要从内置词库排除的完整词条（2–80字）；不会豁免同名自定义规则。": [
+  "发送UTF-8词库文件（单次最多1 MiB）或粘贴文字。每行一词；支持 匹配方式+Tab+词 或JSONL。总条数不限，可分批追加。已有词保持原规则。": [
     "app/admin_ui.py:23"
   ],
-  "发送要恢复的完整内置词条（2–80字）。": [
+  "发送要从内置词库排除的完整词条（2–80字）；不会豁免同名自定义规则。": [
     "app/admin_ui.py:24"
   ],
-  "发送搜索文字（1–80字），按文字查找词库。": [
+  "发送要恢复的完整内置词条（2–80字）。": [
     "app/admin_ui.py:25"
   ],
-  "发送域名，每行一个（最多80个）。例如 example.com；其子域名也会放行。": [
+  "发送搜索文字（1–80字），按文字查找词库。": [
     "app/admin_ui.py:26"
   ],
-  "发送触发关键词，多个词用逗号隔开。": [
+  "发送域名，每行一个（最多80个）。例如 example.com；其子域名也会放行。": [
     "app/admin_ui.py:27"
   ],
-  "发送回复正文，或发送带说明的图片/视频/动图/文件。": [
+  "发送触发关键词，多个词用逗号隔开。": [
     "app/admin_ui.py:28"
   ],
-  "发送链接按钮：官网 - https://example.com\n多个按钮用 && 隔开；不需要则发送 -。": [
+  "发送回复正文，或发送带说明的图片/视频/动图/文件。": [
     "app/admin_ui.py:29"
   ],
-  "发送欢迎语（最多1500字），{name} 会替换为新人名字。": [
+  "发送链接按钮：官网 - https://example.com\n多个按钮用 && 隔开；不需要则发送 -。": [
     "app/admin_ui.py:30"
   ],
-  "发送群规（最多1500字）。": [
+  "发送欢迎语（最多1500字），{name} 会替换为新人名字。": [
     "app/admin_ui.py:31"
   ],
-  "发送独立日志群或频道的负数ID（在目标群发 /id 获取）；发送 0 关闭。": [
+  "发送群规（最多1500字）。": [
     "app/admin_ui.py:32"
   ],
-  "发送奖励名称（2–60字）。": [
+  "发送独立日志群或频道的负数ID（在目标群发 /id 获取）；发送 0 关闭。": [
     "app/admin_ui.py:33"
+  ],
+  "发送奖励名称（2–60字）。": [
+    "app/admin_ui.py:34"
   ],
   "发送单价（1–10000积分）。": [
-    "app/admin_ui.py:33"
+    "app/admin_ui.py:34"
   ],
   "发送库存（1–1000）。": [
-    "app/admin_ui.py:34"
-  ],
-  "发送说明（最多300字）。": [
-    "app/admin_ui.py:34"
-  ],
-  "发送免费抽奖标题（2–100字）。活动不收费，不扣积分。": [
     "app/admin_ui.py:35"
   ],
-  "发送每日时间，例如 09:00。": [
+  "发送说明（最多300字）。": [
+    "app/admin_ui.py:35"
+  ],
+  "发送免费抽奖标题（2–100字）。活动不收费，不扣积分。": [
     "app/admin_ui.py:36"
   ],
+  "发送每日时间，例如 09:00。": [
+    "app/admin_ui.py:37"
+  ],
   "发送公告标题（最多60字）。": [
-    "app/admin_ui.py:37",
-    "app/admin_ui.py:39",
-    "app/admin_ui.py:41"
-  ],
-  "发送公告正文（最多3500字）。": [
-    "app/admin_ui.py:37",
-    "app/admin_ui.py:39",
-    "app/admin_ui.py:41"
-  ],
-  "发送星期和时间，例如 一 09:00。": [
-    "app/admin_ui.py:38"
-  ],
-  "发送未来日期时间，例如 2026-12-20 09:00。": [
-    "app/admin_ui.py:40"
-  ],
-  "发送待测试文字（最多1000字）。仅测试文字规则，不计入刷屏，不执行处罚。": [
+    "app/admin_ui.py:38",
+    "app/admin_ui.py:40",
     "app/admin_ui.py:42"
   ],
-  "发送成员数字ID。": [
+  "发送公告正文（最多3500字）。": [
+    "app/admin_ui.py:38",
+    "app/admin_ui.py:40",
+    "app/admin_ui.py:42"
+  ],
+  "发送星期和时间，例如 一 09:00。": [
+    "app/admin_ui.py:39"
+  ],
+  "发送未来日期时间，例如 2026-12-20 09:00。": [
+    "app/admin_ui.py:41"
+  ],
+  "发送待测试文字（最多1000字）。仅测试文字规则，不计入刷屏，不执行处罚。": [
     "app/admin_ui.py:43"
+  ],
+  "发送成员数字ID。": [
+    "app/admin_ui.py:44"
   ],
   "发送要调整的积分：正数增加，负数扣除，范围 -10000 到 10000。": [
-    "app/admin_ui.py:43"
+    "app/admin_ui.py:44"
   ],
   "列表已过期，请重新打开。": [
-    "app/admin_ui.py:76"
+    "app/admin_ui.py:77"
   ],
   "关键词已删除，请刷新列表。": [
-    "app/admin_ui.py:89"
+    "app/admin_ui.py:90"
   ],
   "◀️ 上一页": [
-    "app/admin_ui.py:106",
+    "app/admin_ui.py:107",
     "app/service.py:344",
     "app/word_ui.py:60"
   ],
   "下一页 ▶️": [
-    "app/admin_ui.py:106",
+    "app/admin_ui.py:107",
     "app/service.py:346",
     "app/word_ui.py:62"
   ],
   "\n没有符合的关键词。": [
-    "app/admin_ui.py:114"
+    "app/admin_ui.py:115"
   ],
   "\n十分钟内有效；可发送 /cancel。": [
-    "app/admin_ui.py:134"
+    "app/admin_ui.py:135"
   ],
   "预览发送失败，未执行；请重新打开操作。": [
-    "app/admin_ui.py:153",
-    "app/admin_ui.py:148"
+    "app/admin_ui.py:154",
+    "app/admin_ui.py:149"
   ],
   "✅ 已取消。": [
-    "app/admin_ui.py:169"
+    "app/admin_ui.py:170"
   ],
   "编辑已过期或管理权限已失效，请重新打开面板。": [
-    "app/admin_ui.py:173"
+    "app/admin_ui.py:174"
   ],
   "请点击上方确认按钮，或发送 /cancel。": [
-    "app/admin_ui.py:176"
+    "app/admin_ui.py:177"
   ],
   "时长范围为1–525600分钟；只有封禁支持0表示永久。": [
-    "app/admin_ui.py:255"
+    "app/admin_ui.py:256"
   ],
   "数值超出允许范围。": [
-    "app/admin_ui.py:295"
+    "app/admin_ui.py:296"
   ],
   "内容长度应为 {p0}–{p1} 字。": [
-    "app/admin_ui.py:321"
+    "app/admin_ui.py:322"
   ],
   "\n观察包括违禁词、链接、转发、刷屏、图片和频道过滤；不改变新人验证及手动管理操作。": [
-    "app/admin_ui.py:333"
+    "app/admin_ui.py:334"
   ],
   "\n「媒体连发」中可设置相册按一条计数；每张说明及内容重复检测仍生效。": [
-    "app/admin_ui.py:336"
+    "app/admin_ui.py:337"
   ],
   "💬 自动回复（点击条目查看或删除）": [
-    "app/admin_ui.py:398"
+    "app/admin_ui.py:401"
   ],
   "关键词已删除。": [
-    "app/admin_ui.py:597"
+    "app/admin_ui.py:617"
   ],
   "关键词匹配方式已更新。": [
-    "app/admin_ui.py:597"
+    "app/admin_ui.py:617"
   ],
   "保护已开始。": [
-    "app/admin_ui.py:605"
+    "app/admin_ui.py:625"
   ],
   "额外保护已停止；已有验证题仍有效。": [
-    "app/admin_ui.py:605"
+    "app/admin_ui.py:625"
   ],
   "目标是管理员、本机器人或身份无法核验。": [
-    "app/admin_ui.py:682"
+    "app/admin_ui.py:704"
   ],
   "机器人缺少限制成员权限。": [
-    "app/admin_ui.py:687"
+    "app/admin_ui.py:709"
   ],
   "警告 {p0}": [
-    "app/admin_ui.py:691"
-  ],
-  "成员 {p0} 当前 {p1} 次警告。": [
-    "app/admin_ui.py:693"
-  ],
-  "禁言仅支持超级群组。": [
-    "app/admin_ui.py:696"
-  ],
-  "Telegram操作未确认成功，请核对权限和成员状态后重新操作。": [
     "app/admin_ui.py:713"
   ],
+  "成员 {p0} 当前 {p1} 次警告。": [
+    "app/admin_ui.py:715"
+  ],
+  "禁言仅支持超级群组。": [
+    "app/admin_ui.py:718"
+  ],
+  "Telegram操作未确认成功，请核对权限和成员状态后重新操作。": [
+    "app/admin_ui.py:735"
+  ],
   "禁言": [
-    "app/admin_ui.py:718",
+    "app/admin_ui.py:740",
     "app/flood_ui.py:42",
     "app/flood_penalty.py:6"
   ],
   "解除禁言": [
-    "app/admin_ui.py:718"
+    "app/admin_ui.py:740"
   ],
   "封禁": [
-    "app/admin_ui.py:718",
+    "app/admin_ui.py:740",
     "app/flood_ui.py:42"
   ],
   "移出，可重新加入": [
-    "app/admin_ui.py:718"
+    "app/admin_ui.py:740"
   ],
   "解除封禁": [
-    "app/admin_ui.py:718",
-    "app/admin_ui.py:383"
+    "app/admin_ui.py:740",
+    "app/admin_ui.py:386"
   ],
   "发送目标成员数字ID。管理员可在群里回复对方 /id；成员可私聊机器人 /id。": [
-    "app/admin_ui.py:46"
+    "app/admin_ui.py:47"
   ],
   "🗑 删除该关键词": [
-    "app/admin_ui.py:96"
+    "app/admin_ui.py:97"
   ],
   "⬅️ 返回词库列表": [
-    "app/admin_ui.py:98"
+    "app/admin_ui.py:99"
   ],
   "🔎 重新搜索": [
-    "app/admin_ui.py:111"
+    "app/admin_ui.py:112"
   ],
   "❌ 取消 / 返回": [
-    "app/admin_ui.py:129"
+    "app/admin_ui.py:130"
   ],
   "📝 第 {p0}/{p1} 步\n": [
-    "app/admin_ui.py:133"
+    "app/admin_ui.py:134"
   ],
   "⚠️ {p0}\n请重新发送这一步内容，或 /cancel。": [
-    "app/admin_ui.py:244"
+    "app/admin_ui.py:245"
   ],
   "并发词库导入预览已满，请稍后重试。": [
-    "app/admin_ui.py:258"
+    "app/admin_ui.py:259"
   ],
   "词条需为2–80字。": [
-    "app/admin_ui.py:271",
+    "app/admin_ui.py:272",
     "app/store.py:641"
   ],
   "请提供1–80个有效域名，整批尚未保存。": [
-    "app/admin_ui.py:277"
+    "app/admin_ui.py:278"
   ],
   "\n\n🔍 内容过滤执行：": [
-    "app/admin_ui.py:332"
+    "app/admin_ui.py:333"
   ],
   "\n\n欢迎语预览：{p0}\n群规预览：{p1}": [
-    "app/admin_ui.py:339"
+    "app/admin_ui.py:340"
   ],
   "🎁 虚拟积分奖励（点击下架）": [
-    "app/admin_ui.py:402"
+    "app/admin_ui.py:405"
   ],
   "⬅️ 上页": [
-    "app/admin_ui.py:466"
+    "app/admin_ui.py:469"
   ],
   "下页 ➡️": [
-    "app/admin_ui.py:468"
-  ],
-  "🔄 刷新": [
     "app/admin_ui.py:471"
   ],
+  "🔄 刷新": [
+    "app/admin_ui.py:474"
+  ],
   "\n第 {p0}/{p1} 页\n": [
-    "app/admin_ui.py:473"
+    "app/admin_ui.py:476"
   ],
   "暂无记录": [
-    "app/admin_ui.py:473",
-    "app/commands.py:281",
+    "app/admin_ui.py:476",
+    "app/commands.py:282",
     "app/member_ui.py:73",
     "app/service.py:536"
   ],
   "✅ 操作完成": [
-    "app/admin_ui.py:488"
+    "app/admin_ui.py:496"
   ],
   "按钮操作 {p0}": [
-    "app/admin_ui.py:490"
+    "app/admin_ui.py:498",
+    "app/admin_ui.py:494"
   ],
   "按钮参数无效。": [
-    "app/admin_ui.py:496",
+    "app/admin_ui.py:504",
     "app/member_ui.py:36"
   ],
   "已标记复核；规则保持当前设置": [
-    "app/admin_ui.py:529"
+    "app/admin_ui.py:537"
   ],
   "关键词：{p0}\n": [
-    "app/admin_ui.py:539"
+    "app/admin_ui.py:547"
   ],
   "保护状态已变化，请重新操作。": [
-    "app/admin_ui.py:600"
+    "app/admin_ui.py:620"
   ],
   "需要超级群组和机器人限制成员权限。": [
-    "app/admin_ui.py:602"
+    "app/admin_ui.py:622"
   ],
   "设置已被其他管理员修改，请重新操作。": [
-    "app/admin_ui.py:611"
+    "app/admin_ui.py:631"
   ],
   "发送禁言分钟数（1–1440）。": [
-    "app/admin_ui.py:47"
+    "app/admin_ui.py:48"
   ],
   "✅ 确认执行": [
-    "app/admin_ui.py:140"
+    "app/admin_ui.py:141"
   ],
   "请发送整数分钟数。": [
-    "app/admin_ui.py:252"
+    "app/admin_ui.py:253"
   ],
   "文件缺少ID或超过1 MiB，可分批追加。": [
-    "app/admin_ui.py:262"
+    "app/admin_ui.py:263"
   ],
   "请发送整数。": [
-    "app/admin_ui.py:287"
+    "app/admin_ui.py:288"
   ],
   "媒体需包含有效文件ID，说明最多1000字。": [
-    "app/admin_ui.py:304"
+    "app/admin_ui.py:305"
   ],
   "仅观察": [
-    "app/admin_ui.py:332",
-    "app/admin_ui.py:386",
+    "app/admin_ui.py:333",
+    "app/admin_ui.py:389",
     "app/flood_ui.py:5",
     "app/service.py:374",
     "app/word_library.py:11",
     "app/word_library.py:199"
   ],
   "正常处罚": [
-    "app/admin_ui.py:332",
-    "app/admin_ui.py:386"
+    "app/admin_ui.py:333",
+    "app/admin_ui.py:389"
   ],
   "🧪 测试文字规则": [
-    "app/admin_ui.py:334"
+    "app/admin_ui.py:335"
   ],
   "🔍 查看防护记录": [
-    "app/admin_ui.py:334"
+    "app/admin_ui.py:335"
   ],
   "➕ 批量添加域名": [
-    "app/admin_ui.py:395"
+    "app/admin_ui.py:398"
   ],
   "🧾 最近40笔待核销订单（处理后刷新）": [
-    "app/admin_ui.py:406"
+    "app/admin_ui.py:409"
   ],
   "#{p0} {p1} · 消息{p2} · {p3} · {p4} · {p5}": [
-    "app/admin_ui.py:434"
+    "app/admin_ui.py:437"
   ],
   "✓ 复核 #{p0}": [
-    "app/admin_ui.py:443"
+    "app/admin_ui.py:446"
   ],
   "#{p0} {p1} · {p2}分 · 库存{p3}": [
-    "app/admin_ui.py:452"
+    "app/admin_ui.py:455"
   ],
   "确认已失效，请重新打开操作。": [
-    "app/admin_ui.py:485"
+    "app/admin_ui.py:488"
+  ],
+  "✅ 已保存：{p0}": [
+    "app/admin_ui.py:492"
   ],
   "未知操作。": [
-    "app/admin_ui.py:499",
-    "app/admin_ui.py:674"
+    "app/admin_ui.py:507",
+    "app/admin_ui.py:696"
   ],
   "记录已过期。": [
-    "app/admin_ui.py:528"
+    "app/admin_ui.py:536"
   ],
   "未知关键词匹配方式。": [
-    "app/admin_ui.py:537"
+    "app/admin_ui.py:545"
   ],
   "删除该关键词。": [
-    "app/admin_ui.py:539"
-  ],
-  "匹配方式：{p0} → {p1}": [
-    "app/admin_ui.py:540"
-  ],
-  "立即开始 {p0} 分钟额外新人验证。": [
     "app/admin_ui.py:547"
   ],
-  "停止额外新人验证；已有验证题仍有效，常规新人验证开关不受影响。": [
+  "匹配方式：{p0} → {p1}": [
     "app/admin_ui.py:548"
   ],
-  "OCR模式：{p0}。自动删除可能误判，建议先使用仅审核。": [
-    "app/admin_ui.py:553"
+  "立即开始 {p0} 分钟额外新人验证。": [
+    "app/admin_ui.py:555"
+  ],
+  "停止额外新人验证；已有验证题仍有效，常规新人验证开关不受影响。": [
+    "app/admin_ui.py:556"
+  ],
+  "OCR模式：{p0} → {p1}\n{p2}": [
+    "app/admin_ui.py:573"
   ],
   "必须使用独立日志群，且你在目标群也有管理权限。": [
-    "app/admin_ui.py:615"
+    "app/admin_ui.py:635"
   ],
   "机器人必须具有目标群管理权限及频道发消息权限。": [
-    "app/admin_ui.py:621"
+    "app/admin_ui.py:641"
   ],
   "该回复已被其他管理员修改，请重新预览。": [
-    "app/admin_ui.py:627"
+    "app/admin_ui.py:647"
   ],
   "违禁词": [
-    "app/admin_ui.py:196",
-    "app/service.py:1421",
-    "app/service.py:1427",
-    "app/service.py:1284",
-    "app/service.py:1462",
+    "app/admin_ui.py:197",
+    "app/service.py:1425",
+    "app/service.py:1431",
+    "app/service.py:1288",
+    "app/service.py:1466",
+    "app/service.py:1493",
     "app/service.py:1489",
-    "app/service.py:1485",
     "app/moderation.py:307"
   ],
   "\n不包含图片、隐藏实体、频率或成员身份检查。": [
-    "app/admin_ui.py:199"
+    "app/admin_ui.py:200"
   ],
   "文件下载失败，请检查网络后重试。": [
-    "app/admin_ui.py:267"
+    "app/admin_ui.py:268"
   ],
   "\n按钮可直接选择模式；仅审核会写入防护记录。精确例外同样用于 OCR。": [
-    "app/admin_ui.py:347"
+    "app/admin_ui.py:350"
   ],
   "➕ 添加/替换回复": [
-    "app/admin_ui.py:399"
+    "app/admin_ui.py:402"
   ],
   "📅 定时公告 · 时区 {p0}": [
-    "app/admin_ui.py:409"
+    "app/admin_ui.py:412"
   ],
   " · 已复核": [
-    "app/admin_ui.py:434"
+    "app/admin_ui.py:437"
   ],
   "  规则：{p0}": [
-    "app/admin_ui.py:436"
-  ],
-  "  识别：": [
     "app/admin_ui.py:439"
   ],
-  "查看原消息": [
-    "app/admin_ui.py:445"
-  ],
-  "未知入群防护操作。": [
-    "app/admin_ui.py:544"
-  ],
-  "条目已变化，请重新预览。": [
-    "app/admin_ui.py:632"
-  ],
-  "🧪 文字规则测试：": [
-    "app/admin_ui.py:199"
-  ],
-  "✏️ 编辑欢迎语": [
-    "app/admin_ui.py:338"
-  ],
-  "📜 编辑群规": [
-    "app/admin_ui.py:338"
-  ],
-  "➕ 上架奖励": [
-    "app/admin_ui.py:403"
-  ],
-  "🧾 待核销订单": [
-    "app/admin_ui.py:403"
-  ],
-  " · 分类：{p0}": [
-    "app/admin_ui.py:436"
-  ],
-  " · 自定义": [
-    "app/admin_ui.py:436"
-  ],
-  "#{p0} {p1} · 成员{p2} · {p3}分": [
-    "app/admin_ui.py:456"
-  ],
-  "⬅️ 返回设置": [
-    "app/admin_ui.py:523",
-    "app/admin_ui.py:531",
-    "app/service.py:586"
-  ],
-  "无效OCR模式。": [
-    "app/admin_ui.py:551"
-  ],
-  "确认删除：": [
-    "app/admin_ui.py:561"
-  ],
-  "下架奖励 #{p0} {p1}；已有订单保留。": [
-    "app/admin_ui.py:568"
-  ],
-  "已移出，解除封禁失败": [
-    "app/admin_ui.py:708"
-  ],
-  "已移出成员，但解除封禁失败；请稍后使用「解除封禁」允许重新加入。": [
-    "app/admin_ui.py:709"
-  ],
-  "未命中": [
-    "app/admin_ui.py:199"
-  ],
-  "✏️ 设置/关闭日志群": [
-    "app/admin_ui.py:343"
-  ],
-  "🔍 防护记录": [
-    "app/admin_ui.py:343",
-    "app/flood_ui.py:21",
-    "app/service.py:58"
-  ],
-  "\n最多答错 {p0} 次；用完后保持限制，超时移出后可重新加入。": [
-    "app/admin_ui.py:352"
-  ],
-  "🎉 免费抽奖 · 不扣积分\n": [
-    "app/admin_ui.py:415"
-  ],
-  "🔍 防护记录 · 保留30天/每群最多1000条\n仅保存消息ID、目标ID、原因和结果，不保存原文/图片。\n标记已复核不会恢复已删除消息，也不自动放宽规则。": [
-    "app/admin_ui.py:422"
-  ],
-  "  处罚：": [
+  "  识别：": [
     "app/admin_ui.py:442"
   ],
-  "列表已变化，请刷新。": [
-    "app/admin_ui.py:559"
+  "查看原消息": [
+    "app/admin_ui.py:448"
   ],
-  "{p0} 订单 #{p1} · {p2} · {p3}分 · 成员{p4}": [
-    "app/admin_ui.py:574"
+  "未知入群防护操作。": [
+    "app/admin_ui.py:552"
   ],
-  "域名": [
-    "app/admin_ui.py:220"
+  "确认后停止本群图片文字扫描。": [
+    "app/admin_ui.py:570"
   ],
-  "关键词": [
-    "app/admin_ui.py:220"
+  "条目已变化，请重新预览。": [
+    "app/admin_ui.py:652"
   ],
-  "正文": [
-    "app/admin_ui.py:220"
+  "🧪 文字规则测试：": [
+    "app/admin_ui.py:200"
   ],
-  "链接按钮": [
-    "app/admin_ui.py:220"
+  "✏️ 编辑欢迎语": [
+    "app/admin_ui.py:339"
   ],
-  "内容": [
-    "app/admin_ui.py:221"
+  "📜 编辑群规": [
+    "app/admin_ui.py:339"
   ],
-  "目标ID": [
-    "app/admin_ui.py:221"
+  "➕ 上架奖励": [
+    "app/admin_ui.py:406"
   ],
-  "名称": [
-    "app/admin_ui.py:221"
+  "🧾 待核销订单": [
+    "app/admin_ui.py:406"
   ],
-  "单价": [
-    "app/admin_ui.py:221"
+  " · 分类：{p0}": [
+    "app/admin_ui.py:439"
   ],
-  "库存": [
-    "app/admin_ui.py:221"
+  " · 自定义": [
+    "app/admin_ui.py:439"
   ],
-  "说明": [
-    "app/admin_ui.py:222"
-  ],
-  "时间规则": [
-    "app/admin_ui.py:222"
-  ],
-  "积分调整": [
-    "app/admin_ui.py:222"
-  ],
-  "分钟数": [
-    "app/admin_ui.py:222"
-  ],
-  "媒体类型": [
-    "app/admin_ui.py:222"
-  ],
-  "\n词库列表支持逐词选择包含、整词或整句匹配。": [
-    "app/admin_ui.py:354"
-  ],
-  "开放中 #{p0} {p1}": [
-    "app/admin_ui.py:415"
-  ],
-  "当前没有开放活动": [
-    "app/admin_ui.py:415"
-  ],
-  "未知列表": [
-    "app/admin_ui.py:424"
-  ],
-  "✅ 核销 #{p0}": [
-    "app/admin_ui.py:457"
-  ],
-  "↩️ 退款": [
-    "app/admin_ui.py:457"
-  ],
-  "\n按钮：": [
-    "app/admin_ui.py:563"
-  ],
-  "奖励已下架。": [
-    "app/admin_ui.py:567"
-  ],
-  "商品状态已变化，请重新预览。": [
-    "app/admin_ui.py:642"
-  ],
-  "⚠️ 同关键词回复已存在，确认后替换。": [
-    "app/admin_ui.py:235"
-  ],
-  "时区：{p0}；下次：{p1}": [
-    "app/admin_ui.py:239"
-  ],
-  "关闭": [
-    "app/admin_ui.py:345",
-    "app/commands.py:73",
-    "app/commands.py:265",
-    "app/flood_ui.py:5",
-    "app/points.py:70",
-    "app/service.py:374",
-    "app/service.py:374",
-    "app/service.py:859",
-    "app/service.py:924",
-    "app/service.py:448",
-    "app/service.py:452",
-    "app/service.py:456",
-    "app/service.py:460",
-    "app/service.py:542",
-    "app/service.py:535",
-    "app/word_library.py:11"
-  ],
-  "仅审核": [
-    "app/admin_ui.py:345"
-  ],
-  "⚠️ 自动删除": [
-    "app/admin_ui.py:346"
-  ],
-  "➕ / ➖ 调整成员积分": [
-    "app/admin_ui.py:349"
-  ],
-  "➕ 每日": [
-    "app/admin_ui.py:410"
-  ],
-  "➕ 每周": [
-    "app/admin_ui.py:410"
-  ],
-  "➕ 单次公告": [
-    "app/admin_ui.py:411"
-  ],
-  "运行": [
+  "#{p0} {p1} · 成员{p2} · {p3}分": [
     "app/admin_ui.py:459"
   ],
-  "暂停/结束": [
-    "app/admin_ui.py:459",
-    "app/service.py:621",
-    "app/service.py:574"
+  "⬅️ 返回设置": [
+    "app/admin_ui.py:531",
+    "app/admin_ui.py:539",
+    "app/service.py:590"
   ],
-  "#{p0} {p1} · {p2} · {p3}人": [
-    "app/admin_ui.py:463"
+  "无效OCR模式。": [
+    "app/admin_ui.py:559"
   ],
-  "订单已处理或列表已变化。": [
-    "app/admin_ui.py:573"
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": [
+    "app/admin_ui.py:561"
   ],
-  "未知按钮。": [
-    "app/admin_ui.py:581",
-    "app/member_ui.py:126"
-  ],
-  "排除内置词：": [
-    "app/admin_ui.py:213"
-  ],
-  "恢复内置词：": [
-    "app/admin_ui.py:213"
-  ],
-  "🎲 开奖": [
-    "app/admin_ui.py:417"
-  ],
-  "取消活动": [
-    "app/admin_ui.py:417",
-    "app/admin_ui.py:579"
-  ],
-  "➕ 创建免费抽奖": [
-    "app/admin_ui.py:419"
-  ],
-  " · 获胜ID {p0}": [
-    "app/admin_ui.py:463"
-  ],
-  "\n媒体：": [
-    "app/admin_ui.py:563"
-  ],
-  "核销": [
-    "app/admin_ui.py:574"
-  ],
-  "退款并恢复库存": [
-    "app/admin_ui.py:574"
-  ],
-  "活动已变化，请刷新。": [
-    "app/admin_ui.py:578"
-  ],
-  "🎉 免费抽奖 #{p0} {p1}\n参与 {p2} 人 · 获胜成员ID：{p3}": [
-    "app/admin_ui.py:655"
-  ],
-  "无": [
-    "app/admin_ui.py:230",
-    "app/word_ui.py:22"
-  ],
-  "🔎 搜索词库": [
-    "app/admin_ui.py:355"
-  ],
-  "📚 分类词库": [
-    "app/admin_ui.py:356",
-    "app/word_ui.py:44"
-  ],
-  "📥 文件导入": [
-    "app/admin_ui.py:356"
-  ],
-  "📤 导出自定义词库": [
-    "app/admin_ui.py:357"
-  ],
-  "🈶 中文变体识别": [
-    "app/admin_ui.py:358",
-    "app/word_ui.py:27"
-  ],
-  "🚨 集中入群保护\n{p0}\n自动检测：{p1}\n{p2} 秒内 {p3} 个不同普通成员入群，触发 {p4} 分钟保护。\n从触发者起，新人需完成验证；不追溯之前的成员。管理员和机器人不计入人数。\n到期自动停止对后续新人的额外验证；已经收到验证题的成员仍需答题。\n保护期限重启后保留，入群计数重启后重新累计。\n关闭自动检测不会提前停止已有保护，请使用下方停止按钮。": [
-    "app/admin_ui.py:368"
-  ],
-  "\n回复正文：": [
-    "app/admin_ui.py:563"
-  ],
-  "开奖（结果固定，不能重抽）": [
-    "app/admin_ui.py:579"
-  ],
-  "活动已变化，请重新预览。": [
-    "app/admin_ui.py:651"
-  ],
-  "积分已调整：成员 {p0}，当前余额 {p1}。": [
-    "app/admin_ui.py:670"
-  ],
-  "当前未处于保护期": [
-    "app/admin_ui.py:367"
-  ],
-  "🔐 机器人权限检查\n群类型：{p0}\n管理身份：{p1}\n删除消息：{p2}\n限制成员：{p3}\nOCR引擎：{p4}\n\n内容清理需要删除消息权限；禁言、新人验证和集中入群保护需要限制成员权限及超级群组。\n如缺少权限，请在 Telegram 群设置中授予后刷新。": [
-    "app/admin_ui.py:378"
-  ],
-  "\n群内公告发送失败，结果已保存。": [
-    "app/admin_ui.py:657"
-  ],
-  "OCR引擎未启用。需配置 WITH_OCR=1、OCR_ENABLED=1 并构建容器。": [
-    "app/admin_ui.py:661"
+  "当前已是{p0}，无需重复保存。": [
+    "app/admin_ui.py:565"
   ],
   "机器人缺少删除消息权限。": [
-    "app/admin_ui.py:663",
+    "app/admin_ui.py:568",
+    "app/admin_ui.py:683",
     "app/flood_ui.py:93",
     "app/word_ui.py:157",
     "app/word_ui.py:162"
   ],
-  "保护中，至 ": [
-    "app/admin_ui.py:366"
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": [
+    "app/admin_ui.py:571"
   ],
-  "👮 成员管理\n选择操作 → 输入数字ID → 预览确认。\n每次重新核验管理权限和目标身份；管理员与本机器人受保护。\n警告达到上限后临时禁言60分钟。": [
+  "自动删除可能误判，建议先使用仅审核。": [
+    "app/admin_ui.py:572",
+    "app/commands.py:300"
+  ],
+  "确认删除：": [
+    "app/admin_ui.py:581"
+  ],
+  "下架奖励 #{p0} {p1}；已有订单保留。": [
+    "app/admin_ui.py:588"
+  ],
+  "已移出，解除封禁失败": [
+    "app/admin_ui.py:730"
+  ],
+  "已移出成员，但解除封禁失败；请稍后使用「解除封禁」允许重新加入。": [
+    "app/admin_ui.py:731"
+  ],
+  "未命中": [
+    "app/admin_ui.py:200"
+  ],
+  "✏️ 设置/关闭日志群": [
+    "app/admin_ui.py:344"
+  ],
+  "🔍 防护记录": [
+    "app/admin_ui.py:344",
+    "app/flood_ui.py:21",
+    "app/service.py:58"
+  ],
+  "\n最多答错 {p0} 次；用完后保持限制，超时移出后可重新加入。": [
+    "app/admin_ui.py:355"
+  ],
+  "🎉 免费抽奖 · 不扣积分\n": [
+    "app/admin_ui.py:418"
+  ],
+  "🔍 防护记录 · 保留30天/每群最多1000条\n仅保存消息ID、目标ID、原因和结果，不保存原文/图片。\n标记已复核不会恢复已删除消息，也不自动放宽规则。": [
+    "app/admin_ui.py:425"
+  ],
+  "  处罚：": [
+    "app/admin_ui.py:445"
+  ],
+  "列表已变化，请刷新。": [
+    "app/admin_ui.py:579"
+  ],
+  "{p0} 订单 #{p1} · {p2} · {p3}分 · 成员{p4}": [
+    "app/admin_ui.py:594"
+  ],
+  "域名": [
+    "app/admin_ui.py:221"
+  ],
+  "关键词": [
+    "app/admin_ui.py:221"
+  ],
+  "正文": [
+    "app/admin_ui.py:221"
+  ],
+  "链接按钮": [
+    "app/admin_ui.py:221"
+  ],
+  "内容": [
+    "app/admin_ui.py:222"
+  ],
+  "目标ID": [
+    "app/admin_ui.py:222"
+  ],
+  "名称": [
+    "app/admin_ui.py:222"
+  ],
+  "单价": [
+    "app/admin_ui.py:222"
+  ],
+  "库存": [
+    "app/admin_ui.py:222"
+  ],
+  "说明": [
+    "app/admin_ui.py:223"
+  ],
+  "时间规则": [
+    "app/admin_ui.py:223"
+  ],
+  "积分调整": [
+    "app/admin_ui.py:223"
+  ],
+  "分钟数": [
+    "app/admin_ui.py:223"
+  ],
+  "媒体类型": [
+    "app/admin_ui.py:223"
+  ],
+  "\n词库列表支持逐词选择包含、整词或整句匹配。": [
+    "app/admin_ui.py:357"
+  ],
+  "开放中 #{p0} {p1}": [
+    "app/admin_ui.py:418"
+  ],
+  "当前没有开放活动": [
+    "app/admin_ui.py:418"
+  ],
+  "未知列表": [
+    "app/admin_ui.py:427"
+  ],
+  "✅ 核销 #{p0}": [
+    "app/admin_ui.py:460"
+  ],
+  "↩️ 退款": [
+    "app/admin_ui.py:460"
+  ],
+  "\n按钮：": [
+    "app/admin_ui.py:583"
+  ],
+  "奖励已下架。": [
+    "app/admin_ui.py:587"
+  ],
+  "商品状态已变化，请重新预览。": [
+    "app/admin_ui.py:662"
+  ],
+  "⚠️ 同关键词回复已存在，确认后替换。": [
+    "app/admin_ui.py:236"
+  ],
+  "时区：{p0}；下次：{p1}": [
+    "app/admin_ui.py:240"
+  ],
+  "➕ / ➖ 调整成员积分": [
+    "app/admin_ui.py:352"
+  ],
+  "➕ 每日": [
+    "app/admin_ui.py:413"
+  ],
+  "➕ 每周": [
+    "app/admin_ui.py:413"
+  ],
+  "➕ 单次公告": [
+    "app/admin_ui.py:414"
+  ],
+  "运行": [
+    "app/admin_ui.py:462"
+  ],
+  "暂停/结束": [
+    "app/admin_ui.py:462",
+    "app/service.py:625",
+    "app/service.py:578"
+  ],
+  "#{p0} {p1} · {p2} · {p3}人": [
+    "app/admin_ui.py:466"
+  ],
+  "订单已处理或列表已变化。": [
+    "app/admin_ui.py:593"
+  ],
+  "未知按钮。": [
+    "app/admin_ui.py:601",
+    "app/member_ui.py:126"
+  ],
+  "排除内置词：": [
+    "app/admin_ui.py:214"
+  ],
+  "恢复内置词：": [
+    "app/admin_ui.py:214"
+  ],
+  "🎲 开奖": [
+    "app/admin_ui.py:420"
+  ],
+  "取消活动": [
+    "app/admin_ui.py:420",
+    "app/admin_ui.py:599"
+  ],
+  "➕ 创建免费抽奖": [
+    "app/admin_ui.py:422"
+  ],
+  " · 获胜ID {p0}": [
+    "app/admin_ui.py:466"
+  ],
+  "\n媒体：": [
+    "app/admin_ui.py:583"
+  ],
+  "核销": [
+    "app/admin_ui.py:594"
+  ],
+  "退款并恢复库存": [
+    "app/admin_ui.py:594"
+  ],
+  "活动已变化，请刷新。": [
+    "app/admin_ui.py:598"
+  ],
+  "🎉 免费抽奖 #{p0} {p1}\n参与 {p2} 人 · 获胜成员ID：{p3}": [
+    "app/admin_ui.py:675"
+  ],
+  "无": [
+    "app/admin_ui.py:231",
+    "app/word_ui.py:22"
+  ],
+  "🔎 搜索词库": [
+    "app/admin_ui.py:358"
+  ],
+  "📚 分类词库": [
+    "app/admin_ui.py:359",
+    "app/word_ui.py:44"
+  ],
+  "📥 文件导入": [
+    "app/admin_ui.py:359"
+  ],
+  "📤 导出自定义词库": [
+    "app/admin_ui.py:360"
+  ],
+  "🈶 中文变体识别": [
+    "app/admin_ui.py:361",
+    "app/word_ui.py:27"
+  ],
+  "🚨 集中入群保护\n{p0}\n自动检测：{p1}\n{p2} 秒内 {p3} 个不同普通成员入群，触发 {p4} 分钟保护。\n从触发者起，新人需完成验证；不追溯之前的成员。管理员和机器人不计入人数。\n到期自动停止对后续新人的额外验证；已经收到验证题的成员仍需答题。\n保护期限重启后保留，入群计数重启后重新累计。\n关闭自动检测不会提前停止已有保护，请使用下方停止按钮。": [
+    "app/admin_ui.py:371"
+  ],
+  "\n回复正文：": [
+    "app/admin_ui.py:583"
+  ],
+  "开奖（结果固定，不能重抽）": [
+    "app/admin_ui.py:599"
+  ],
+  "活动已变化，请重新预览。": [
+    "app/admin_ui.py:671"
+  ],
+  "积分已调整：成员 {p0}，当前余额 {p1}。": [
+    "app/admin_ui.py:692"
+  ],
+  "当前未处于保护期": [
+    "app/admin_ui.py:370"
+  ],
+  "🔐 机器人权限检查\n群类型：{p0}\n管理身份：{p1}\n删除消息：{p2}\n限制成员：{p3}\nOCR引擎：{p4}\n\n内容清理需要删除消息权限；禁言、新人验证和集中入群保护需要限制成员权限及超级群组。\n如缺少权限，请在 Telegram 群设置中授予后刷新。": [
     "app/admin_ui.py:381"
   ],
+  "\n群内公告发送失败，结果已保存。": [
+    "app/admin_ui.py:677"
+  ],
+  "OCR模式已变化，请返回功能页面重新选择。": [
+    "app/admin_ui.py:685"
+  ],
+  "保护中，至 ": [
+    "app/admin_ui.py:369"
+  ],
+  "👮 成员管理\n选择操作 → 输入数字ID → 预览确认。\n每次重新核验管理权限和目标身份；管理员与本机器人受保护。\n警告达到上限后临时禁言60分钟。": [
+    "app/admin_ui.py:384"
+  ],
   "目标不是当前群成员。": [
-    "app/admin_ui.py:668"
+    "app/admin_ui.py:690"
   ],
   "开": [
-    "app/admin_ui.py:368",
-    "app/commands.py:264",
+    "app/admin_ui.py:371",
+    "app/commands.py:265",
     "app/flood_ui.py:18",
     "app/service.py:370",
     "app/service.py:370",
@@ -745,8 +742,8 @@
     "app/service.py:464"
   ],
   "关": [
-    "app/admin_ui.py:368",
-    "app/commands.py:264",
+    "app/admin_ui.py:371",
+    "app/commands.py:265",
     "app/flood_ui.py:18",
     "app/service.py:370",
     "app/service.py:370",
@@ -757,353 +754,364 @@
     "app/service.py:464"
   ],
   "🛡️ 立即开始保护": [
-    "app/admin_ui.py:369"
+    "app/admin_ui.py:372"
   ],
   "⏹ 停止额外保护": [
-    "app/admin_ui.py:370"
+    "app/admin_ui.py:373"
   ],
   "❌ / 未能确认": [
-    "app/admin_ui.py:377"
+    "app/admin_ui.py:380"
   ],
   "未能获取": [
-    "app/admin_ui.py:378",
-    "app/admin_ui.py:378"
+    "app/admin_ui.py:381",
+    "app/admin_ui.py:381"
   ],
   "可用": [
-    "app/admin_ui.py:378"
+    "app/admin_ui.py:381"
   ],
   "未启用": [
-    "app/admin_ui.py:378"
+    "app/admin_ui.py:381"
   ],
   "🔄 重新检查": [
-    "app/admin_ui.py:379"
+    "app/admin_ui.py:382"
   ],
   "⚠️ 警告": [
-    "app/admin_ui.py:382",
+    "app/admin_ui.py:385",
     "app/flood_ui.py:30"
   ],
   "清除警告": [
-    "app/admin_ui.py:382",
-    "app/commands.py:165"
+    "app/admin_ui.py:385",
+    "app/commands.py:166"
   ],
   "🔇 禁言": [
-    "app/admin_ui.py:382",
+    "app/admin_ui.py:385",
     "app/flood_ui.py:30"
   ],
   "🔊 解禁言": [
-    "app/admin_ui.py:383"
-  ],
-  "⛔ 封禁": [
-    "app/admin_ui.py:383"
-  ],
-  "移出可重进": [
-    "app/admin_ui.py:383"
-  ],
-  "\n内容过滤：": [
     "app/admin_ui.py:386"
   ],
-  "✅ {p0} 已{p1}。": [
-    "app/commands.py:73"
+  "⛔ 封禁": [
+    "app/admin_ui.py:386"
   ],
-  "管理员更改 {p0} = {p1}": [
+  "移出可重进": [
+    "app/admin_ui.py:386"
+  ],
+  "\n内容过滤：": [
+    "app/admin_ui.py:389"
+  ],
+  "✅ {p0} 已{p1}。": [
     "app/commands.py:74"
   ],
+  "管理员更改 {p0} = {p1}": [
+    "app/commands.py:75"
+  ],
   "删除": [
-    "app/commands.py:125",
-    "app/commands.py:352",
+    "app/commands.py:126",
     "app/commands.py:353",
-    "app/service.py:666",
-    "app/service.py:665"
+    "app/commands.py:354",
+    "app/service.py:670",
+    "app/service.py:669"
   ],
   "暂停": [
-    "app/commands.py:125",
-    "app/service.py:614"
+    "app/commands.py:126",
+    "app/service.py:618"
   ],
   "恢复": [
-    "app/commands.py:125"
-  ],
-  "✅ 定时公告 #{p0} 已{p1}。": [
     "app/commands.py:126"
   ],
-  "{p0}定时公告 #{p1}": [
+  "✅ 定时公告 #{p0} 已{p1}。": [
     "app/commands.py:127"
   ],
+  "{p0}定时公告 #{p1}": [
+    "app/commands.py:128"
+  ],
   "管理成员": [
-    "app/commands.py:167"
+    "app/commands.py:168"
   ],
   "⚠️ 无法{p0}：请先授予机器人对应的管理员权限。": [
-    "app/commands.py:50"
+    "app/commands.py:51"
   ],
   "用法：/{p0} on 或 /{p1} off": [
-    "app/commands.py:58"
+    "app/commands.py:59"
   ],
   "📅 定时公告（以服务器 TZ 时区为准）\n/schedule daily 09:00 | 早安 | 大家早上好！\n/schedule weekly mon 19:30 | 周提醒 | 今天记得查看群规\n/schedule once 2026-10-20 15:00 | 活动提醒 | 活动即将开始\n/schedule list 查看任务\n/schedule pause 编号、/schedule resume 编号、/schedule del 编号\n每群最多 20 条，暂停或删除不会影响其他群。": [
-    "app/commands.py:88"
+    "app/commands.py:89"
   ],
   "✅ 创建定时公告 #{p0}：{p1}\n下次发送：{p2}（{p3}）": [
-    "app/commands.py:98"
-  ],
-  "创建定时公告 #{p0}": [
     "app/commands.py:99"
   ],
+  "创建定时公告 #{p0}": [
+    "app/commands.py:100"
+  ],
   "📅 本群定时公告\n": [
-    "app/commands.py:103"
-  ],
-  "未知定时指令。发送 /schedule 查看格式": [
-    "app/commands.py:108"
-  ],
-  "该编号不属于本群，或任务已被删除": [
-    "app/commands.py:117"
-  ],
-  "⚠️ 为安全起见，不能对机器人、管理员或无法核验身份的目标执行操作。": [
-    "app/commands.py:143"
-  ],
-  "⚠️ 执行失败，请检查机器人权限或目标用户状态。": [
-    "app/commands.py:195"
-  ],
-  "⚠️ 本功能仅支持 Telegram 超级群组。": [
-    "app/commands.py:63"
-  ],
-  "启用该功能": [
-    "app/commands.py:70"
-  ],
-  "暂无定时消息": [
     "app/commands.py:104"
   ],
+  "未知定时指令。发送 /schedule 查看格式": [
+    "app/commands.py:109"
+  ],
+  "该编号不属于本群，或任务已被删除": [
+    "app/commands.py:118"
+  ],
+  "⚠️ 为安全起见，不能对机器人、管理员或无法核验身份的目标执行操作。": [
+    "app/commands.py:144"
+  ],
+  "⚠️ 执行失败，请检查机器人权限或目标用户状态。": [
+    "app/commands.py:196"
+  ],
+  "⚠️ 本功能仅支持 Telegram 超级群组。": [
+    "app/commands.py:64"
+  ],
+  "启用该功能": [
+    "app/commands.py:71"
+  ],
+  "暂无定时消息": [
+    "app/commands.py:105"
+  ],
   "用法：/schedule {p0} 正整数编号": [
-    "app/commands.py:114"
+    "app/commands.py:115"
   ],
   "⚠️ /{p0} 请回复目标成员的消息。": [
-    "app/commands.py:139"
+    "app/commands.py:140"
   ],
   "警告 {p0}/{p1}": [
-    "app/commands.py:149"
+    "app/commands.py:150"
   ],
   "👤 点击打开本群成员服务：签到、积分、商城、订单、免费抽奖和群规。": [
-    "app/commands.py:238"
+    "app/commands.py:239"
   ],
   "⚙️ 私聊 @{p0}，发送 /start 打开管理面板。": [
-    "app/commands.py:262"
+    "app/commands.py:263"
   ],
   "开启": [
-    "app/commands.py:73",
+    "app/commands.py:74",
     "app/points.py:70",
-    "app/service.py:614",
+    "app/service.py:618",
     "app/service.py:448",
     "app/service.py:452",
     "app/service.py:456",
     "app/service.py:460",
     "app/service.py:542",
     "app/service.py:535",
-    "app/service.py:574"
+    "app/service.py:578"
+  ],
+  "关闭": [
+    "app/commands.py:74",
+    "app/commands.py:266",
+    "app/flood_ui.py:5",
+    "app/points.py:70",
+    "app/service.py:374",
+    "app/service.py:374",
+    "app/service.py:863",
+    "app/service.py:928",
+    "app/service.py:448",
+    "app/service.py:452",
+    "app/service.py:456",
+    "app/service.py:460",
+    "app/service.py:542",
+    "app/service.py:535",
+    "app/word_library.py:11"
   ],
   "或使用 /unban 数字ID。": [
-    "app/commands.py:140"
+    "app/commands.py:141"
   ],
   "自动禁言": [
-    "app/commands.py:152"
+    "app/commands.py:153"
   ],
   "禁言时长为 1 到 10080 分钟。": [
-    "app/commands.py:178"
+    "app/commands.py:179"
   ],
   "🌐 私聊机器人切换个人语言；管理员可在群设置中修改群内提示语言。": [
-    "app/commands.py:242"
+    "app/commands.py:243"
   ],
   "⚙️ 本群设置\n{p0}\n日志目标：{p1}": [
-    "app/commands.py:265"
+    "app/commands.py:266"
   ],
   "达到警告上限，禁言 60 分钟": [
-    "app/commands.py:162"
+    "app/commands.py:163"
   ],
   "禁言时长请填写整数分钟，例如 /mute 60": [
-    "app/commands.py:175"
+    "app/commands.py:176"
   ],
   "📖 群规\n{p0}": [
-    "app/commands.py:246"
+    "app/commands.py:247"
   ],
   "🛡️ 权限检测\n删除消息：{p0}\n限制成员：{p1}": [
-    "app/commands.py:267"
+    "app/commands.py:268"
   ],
   "🆔 当前群组 ID：{p0}\n你的ID：{p1}": [
-    "app/commands.py:270"
-  ],
-  "📊 今日消息 {p0} | 删除 {p1} | 新成员 {p2} | 处罚 {p3}": [
-    "app/commands.py:274"
-  ],
-  "👤 成员服务": [
-    "app/commands.py:239"
-  ],
-  "\n回复成员ID：{p0}": [
     "app/commands.py:271"
   ],
+  "📊 今日消息 {p0} | 删除 {p1} | 新成员 {p2} | 处罚 {p3}": [
+    "app/commands.py:275"
+  ],
+  "👤 成员服务": [
+    "app/commands.py:240"
+  ],
+  "\n回复成员ID：{p0}": [
+    "app/commands.py:272"
+  ],
   "📈 最近7天：消息 {p0} | 删除 {p1} | 入群 {p2} | 处罚 {p3}": [
-    "app/commands.py:277"
+    "app/commands.py:278"
   ],
   "🌐 界面语言 / Language": [
-    "app/commands.py:243",
+    "app/commands.py:244",
     "app/member_ui.py:147",
     "app/service.py:276",
     "app/service.py:275"
   ],
   "🏆 最近7天活跃成员（ID/消息数）\n": [
-    "app/commands.py:280"
+    "app/commands.py:281"
   ],
-  "🔎 OCR 已设为 {p0}。review 仅记录到管理日志，不删除；delete 有误判风险。": [
-    "app/commands.py:300"
-  ],
-  "OCR 模式修改为 {p0}": [
-    "app/commands.py:301"
-  ],
-  "用法：/ocr off | review | delete": [
-    "app/commands.py:291"
-  ],
-  "OCR 引擎尚未启用。请配置 WITH_OCR=1、OCR_ENABLED=1 并构建容器。": [
-    "app/commands.py:294"
-  ],
-  "先建立独立管理日志群并执行 /setlog 目标群ID，才能启用 OCR review": [
-    "app/commands.py:296"
-  ],
-  "删除模式需要机器人拥有删除消息的管理员权限": [
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": [
     "app/commands.py:298"
   ],
+  "OCR 模式修改为 {p0}": [
+    "app/commands.py:302"
+  ],
+  "用法：/ocr off | review | delete": [
+    "app/commands.py:292"
+  ],
+  "删除模式需要机器人拥有删除消息的管理员权限": [
+    "app/commands.py:296"
+  ],
   "🔎 OCR 可信度门槛已设为 {p0}。": [
-    "app/commands.py:308"
+    "app/commands.py:309"
   ],
   "✅ 重复图片阈值设为 {p0} 次。": [
-    "app/commands.py:315"
+    "app/commands.py:316"
   ],
   "用法：/ocrconfidence 70（40–95）": [
-    "app/commands.py:306"
+    "app/commands.py:307"
   ],
   "✅ 图片检测时间窗口设为 {p0} 秒。": [
-    "app/commands.py:322"
+    "app/commands.py:323"
   ],
   "用法：/imagelimit 3（2-10 次）": [
-    "app/commands.py:313"
+    "app/commands.py:314"
   ],
   "🛡️ 防护高级设置\n/spam on|off 智能反垃圾：{p0}\n/wordloose on|off 拆字识别：{p1}\n/mediaflood on|off 媒体连发：{p2}\n/automute on|off 自动禁言：{p3}\n/nameguard on|off 超长昵称限制：{p4}\n调整阈值：/guardset flood_limit 7\n推荐在私聊 /start 的双列管理面板点击调整。": [
-    "app/commands.py:325"
+    "app/commands.py:326"
   ],
   "用法：/imagewindow 60（30-600 秒）": [
-    "app/commands.py:320"
+    "app/commands.py:321"
   ],
   "✅ {p0} 已设为 {p1}。": [
-    "app/commands.py:335"
-  ],
-  "修改防护阈值 {p0}={p1}": [
     "app/commands.py:336"
   ],
+  "修改防护阈值 {p0}={p1}": [
+    "app/commands.py:337"
+  ],
   "用法：/guardset flood_limit 7（其他项见私聊管理面板）": [
-    "app/commands.py:329"
+    "app/commands.py:330"
   ],
   "✅ 已{p0} {p1} 条违禁词。": [
-    "app/commands.py:352",
-    "app/service.py:666"
+    "app/commands.py:353",
+    "app/service.py:670"
   ],
   "批量{p0}违禁词 {p1} 条": [
-    "app/commands.py:353"
+    "app/commands.py:354"
   ],
   "设置值必须为整数": [
-    "app/commands.py:333"
+    "app/commands.py:334"
   ],
   "请用逗号/换行分隔违禁词，每次 1–80 条": [
-    "app/commands.py:340"
+    "app/commands.py:341"
   ],
   "每条违禁词需为 2–80 个字符；没有保存任何内容": [
-    "app/commands.py:345"
+    "app/commands.py:346"
   ],
   "用法：/wordtest 测试文字（2–1000字，不会删除）": [
-    "app/commands.py:357"
+    "app/commands.py:358"
   ],
   "🧪 违禁词测试（不处罚）：": [
-    "app/commands.py:359"
+    "app/commands.py:360"
   ],
   "✅ 定向例外已更新：只有完整匹配的消息豁免该违禁词。": [
-    "app/commands.py:372"
-  ],
-  "修改违禁词定向例外": [
     "app/commands.py:373"
   ],
+  "修改违禁词定向例外": [
+    "app/commands.py:374"
+  ],
   "导入": [
-    "app/commands.py:352",
     "app/commands.py:353",
-    "app/service.py:666"
+    "app/commands.py:354",
+    "app/service.py:670"
   ],
   "用法：/{p0} 违禁词 | 完整允许文本": [
-    "app/commands.py:364"
+    "app/commands.py:365"
   ],
   "允许文本必须包含对应违禁词，才能避免错误配置": [
-    "app/commands.py:366"
+    "app/commands.py:367"
   ],
   "✅ 违禁词已更新。": [
-    "app/commands.py:384"
+    "app/commands.py:385"
   ],
   "违禁词长度应为 2-80 个字符": [
-    "app/commands.py:379"
+    "app/commands.py:380"
   ],
   "\n完整搜索、分类词库和文件导入请使用 /panel。": [
-    "app/commands.py:388"
+    "app/commands.py:389"
   ],
   "✅ 域名白名单已更新。": [
-    "app/commands.py:397"
+    "app/commands.py:398"
   ],
   "⛔ 自定义违禁词（前30条）：\n": [
-    "app/commands.py:387"
+    "app/commands.py:388"
   ],
   "请输入有效域名，例如 example.com": [
-    "app/commands.py:392"
+    "app/commands.py:393"
   ],
   "暂无": [
-    "app/commands.py:387",
-    "app/commands.py:400",
-    "app/commands.py:432",
+    "app/commands.py:388",
+    "app/commands.py:401",
+    "app/commands.py:433",
     "app/economy_commands.py:185",
     "app/points.py:82",
     "app/service.py:516",
     "app/service.py:528"
   ],
   "🌐 允许的域名：\n": [
-    "app/commands.py:400",
+    "app/commands.py:401",
     "app/service.py:516"
   ],
   "✅ 群规已保存。": [
-    "app/commands.py:405"
+    "app/commands.py:406"
   ],
   "用法：/setrules 群规内容": [
-    "app/commands.py:403"
+    "app/commands.py:404"
   ],
   "✅ 欢迎语已保存。": [
-    "app/commands.py:410"
+    "app/commands.py:411"
   ],
   "用法：/setwelcome 欢迎 {name}！": [
-    "app/commands.py:408"
+    "app/commands.py:409"
   ],
   "✅ 自动回复已更新。": [
-    "app/commands.py:428"
+    "app/commands.py:429"
   ],
   "用法：/addreply 关键词1,关键词2 | 回复内容 | 按钮名称 - https://网址": [
-    "app/commands.py:415"
+    "app/commands.py:416"
   ],
   "💬 自动回复：\n": [
-    "app/commands.py:431"
+    "app/commands.py:432"
   ],
   "✅ 日志目标已更新；处罚仍不会在当前群公开播报。": [
-    "app/commands.py:458"
+    "app/commands.py:459"
   ],
   "日志群必须是独立群组/频道，不能设为当前群。": [
-    "app/commands.py:444"
+    "app/commands.py:445"
   ],
   "你必须同时是日志目标群的管理员。": [
-    "app/commands.py:446"
+    "app/commands.py:447"
   ],
   "请先把机器人设为日志目标群的管理员。": [
-    "app/commands.py:450"
+    "app/commands.py:451"
   ],
   "机器人无法向目标频道发布日志。": [
-    "app/commands.py:456"
+    "app/commands.py:457"
   ],
   "用法：/setlog -100123456789 或 /setlog off": [
-    "app/commands.py:440"
+    "app/commands.py:441"
   ],
   "🪙 积分转账二次确认\n发起人：{p0}\n接收人：{p1}\n金额：{p2} 积分\n仅发起人可以确认，5 分钟后失效。": [
     "app/economy_commands.py:75"
@@ -1140,7 +1148,7 @@
   ],
   "❌ 取消": [
     "app/economy_commands.py:79",
-    "app/service.py:627"
+    "app/service.py:631"
   ],
   "暂未上架奖励": [
     "app/economy_commands.py:96"
@@ -1423,7 +1431,7 @@
   ],
   "未知功能说明，请重新打开功能页。": [
     "app/member_ui.py:59",
-    "app/service.py:836",
+    "app/service.py:840",
     "app/feature_help.py:494",
     "app/feature_help.py:502"
   ],
@@ -1674,10 +1682,10 @@
     "app/service.py:182"
   ],
   "📅 定时公告 #{p0}\n标题：{p1}\n发送频率：{p2} {p3}\n当前状态：{p4}\n下次计划：{p5}\n内容：\n{p6}": [
-    "app/service.py:621"
+    "app/service.py:625"
   ],
   "🤖 中文群管命令（在群内使用）\n/panel 私聊管理面板 /settings 查看开关\n/menu 成员按钮菜单（签到、积分、兑换、抽奖、群规）\n/links on|off /forward on|off /flood on|off\n/captcha on|off /welcome on|off\n/addword 词 /delword 词 /words\n/addwords 词1,词2 /delwords 词1,词2\n/spam on|off /mediaflood on|off /automute on|off\n/nameguard on|off /guardset name_length_limit 40\n/wordloose on|off /wordexcept 词 | 完整文本\n/wordtest 文本 /guardset flood_limit 7\n/allowdomain 域名 /deldomain 域名 /domains\n/setrules 群规文字 /rules 查看群规\n/setwelcome 欢迎语（{name} 自动替换）\n/addreply 词1,词2 | 回复 | 按钮 - https://网址\n/delreply 关键词 /replies；可回复图片/视频添加媒体\n/setlog -100... 设置日志群；/setlog off 关闭\n/stats 今日统计 /statweek 最近7天 /top7 活跃排行\n/schedule 定时公告管理 /bots on|off 防新机器人\n/checkin 签到 /points 我的积分 /pointtop 排行榜\n/transfer 20 回复同群成员，点击确认后转积分\n/shop 查看虚拟奖励 /buy 编号 /myorders\n/shopadd 名称 | 价格 | 库存 | 说明（管理员）\n/shoporders /shopdone 编号 /shoprefund 编号\n/raffle /joinraffle 免费参与\n/rafflestart 标题 /raffledraw /rafflecancel（管理员）\n/ocr review|delete|off /ocrconfidence 70 图片审核\n/pointmode on|off /pointrate 5 管理签到\n回复成员 /pointadd 20、/pointtake 20；/pointlog\n/imageflood on|off /imagelimit 3 /imagewindow 60\n/check 检查权限 /id 查看群 ID\n回复成员消息：/warn、/unwarn、/mute 60、/unmute、/ban、/kick、/dban；/unban 用户ID\n群内不公开播报成功的封禁，管理员发的管理命令不会自动删除。": [
-    "app/service.py:643"
+    "app/service.py:647"
   ],
   "🔗 链接拦截": [
     "app/service.py:65",
@@ -1843,43 +1851,43 @@
     "app/service.py:370"
   ],
   "\n\n⚠️ 确认永久删除？": [
-    "app/service.py:624"
+    "app/service.py:628"
   ],
   "✅ 已更新精确例外（只对完整相同的消息豁免对应关键词）。": [
-    "app/service.py:680"
+    "app/service.py:684"
   ],
   "未知的违禁词编辑操作": [
-    "app/service.py:686"
+    "app/service.py:690"
   ],
   "转账已处理": [
-    "app/service.py:779"
+    "app/service.py:783"
   ],
   "设置已保存": [
-    "app/service.py:1052"
+    "app/service.py:1056"
   ],
   "开关 {p0} → {p1}": [
-    "app/service.py:1061"
+    "app/service.py:1065"
   ],
   "✅ 验证成功，欢迎加入！": [
-    "app/service.py:1096"
+    "app/service.py:1100"
   ],
   "新人验证成功": [
-    "app/service.py:1097"
+    "app/service.py:1101"
   ],
   "本次候选已离群或验证未完成，已移除报名；请再次开奖核验下一批，活动仍开放。": [
-    "app/service.py:1188"
+    "app/service.py:1192"
   ],
   "🧩 {p0}，欢迎加入！请在 {p1} 分钟内回答：{p2} + {p3} = ？（仅本人可点击）": [
-    "app/service.py:1234"
+    "app/service.py:1238"
   ],
   "⛔ {p0}违规消息已清理（本提醒约 {p1} 秒后撤回）": [
-    "app/service.py:1290"
+    "app/service.py:1294"
   ],
   "跨账号重复：批量清理{p0}，{p1}条；早先作者不追加处罚": [
-    "app/service.py:1358"
+    "app/service.py:1362"
   ],
   "外部频道发言": [
-    "app/service.py:1378"
+    "app/service.py:1382"
   ],
   "暂未发现你有权管理的群组。\n请先将机器人加入群、授予管理权限，并在群里发送 /panel。": [
     "app/service.py:274"
@@ -1897,146 +1905,146 @@
     "app/service.py:374"
   ],
   "任务不存在或已经删除。": [
-    "app/service.py:593"
+    "app/service.py:597"
   ],
   "删除定时公告 #{p0}": [
-    "app/service.py:598"
+    "app/service.py:602"
   ],
   "任务已删除": [
-    "app/service.py:599"
+    "app/service.py:603"
   ],
   "定时公告 #{p0} {p1}": [
-    "app/service.py:614"
+    "app/service.py:618"
   ],
   "操作已保存": [
-    "app/service.py:616"
+    "app/service.py:620"
   ],
   "输入太长，每次最多 3500 字": [
-    "app/service.py:648"
+    "app/service.py:652"
   ],
   "私聊批量{p0} {p1} 条违禁词": [
-    "app/service.py:665"
+    "app/service.py:669"
   ],
   "通过私聊修改关键词精确例外": [
-    "app/service.py:679"
+    "app/service.py:683"
   ],
   "\n此操作不会处罚任何成员。": [
-    "app/service.py:685"
+    "app/service.py:689"
   ],
   "✅ 已取消本次编辑。": [
-    "app/service.py:701"
+    "app/service.py:705"
   ],
   "只能在发起转账的原群操作": [
-    "app/service.py:754"
+    "app/service.py:758"
   ],
   "你不是转账发起者，或按钮已失效": [
-    "app/service.py:757"
+    "app/service.py:761"
   ],
   "确认积分转赠 {p0} 分": [
-    "app/service.py:787"
+    "app/service.py:791"
   ],
   "请私聊机器人操作。": [
-    "app/service.py:810",
+    "app/service.py:814",
     "app/language_ui.py:34"
   ],
   "未知或失效的按钮": [
-    "app/service.py:821"
+    "app/service.py:825"
   ],
   "你不是该群管理员。": [
-    "app/service.py:829"
+    "app/service.py:833"
   ],
   "防刷屏：{p0}": [
-    "app/service.py:859"
+    "app/service.py:863"
   ],
   "违禁词状态：{p0}": [
-    "app/service.py:924"
+    "app/service.py:928"
   ],
   "请在私聊中输入内容": [
-    "app/service.py:965"
-  ],
-  "➕ 发送违禁词，多个词用逗号或换行分隔，每次最多80条": [
-    "app/service.py:967"
-  ],
-  "➖ 发送要删除的词，多个词用逗号或换行分隔": [
-    "app/service.py:968"
-  ],
-  "🛡️ 添加精确例外：违禁词 | 完整允许文本": [
     "app/service.py:969"
   ],
-  "❌ 删除精确例外：违禁词 | 完整允许文本": [
-    "app/service.py:970"
-  ],
-  "🧪 发送需要测试的文字（不会自动删除或处罚）": [
+  "➕ 发送违禁词，多个词用逗号或换行分隔，每次最多80条": [
     "app/service.py:971"
   ],
-  "{p0}\n有效期5分钟；发送 /cancel 取消。\n所有操作仅影响当前选择的群组。": [
+  "➖ 发送要删除的词，多个词用逗号或换行分隔": [
+    "app/service.py:972"
+  ],
+  "🛡️ 添加精确例外：违禁词 | 完整允许文本": [
     "app/service.py:973"
   ],
+  "❌ 删除精确例外：违禁词 | 完整允许文本": [
+    "app/service.py:974"
+  ],
+  "🧪 发送需要测试的文字（不会自动删除或处罚）": [
+    "app/service.py:975"
+  ],
+  "{p0}\n有效期5分钟；发送 /cancel 取消。\n所有操作仅影响当前选择的群组。": [
+    "app/service.py:977"
+  ],
   "设置 {p0}：{p1} → {p2}": [
-    "app/service.py:1005"
+    "app/service.py:1009"
   ],
   "不允许修改这个设置。": [
-    "app/service.py:1022"
+    "app/service.py:1026"
   ],
   "按钮参数无效": [
-    "app/service.py:1025",
-    "app/service.py:826"
+    "app/service.py:1029",
+    "app/service.py:830"
   ],
   "非法功能页开关": [
-    "app/service.py:1030"
+    "app/service.py:1034"
   ],
   "机器人缺少必要管理员权限，请先授予权限。": [
-    "app/service.py:1044"
+    "app/service.py:1048"
   ],
   "该功能仅支持超级群组。": [
-    "app/service.py:1049"
+    "app/service.py:1053"
   ],
   "验证按钮无效。": [
-    "app/service.py:1068"
+    "app/service.py:1072"
   ],
   "只能由需要验证的新成员点击。": [
-    "app/service.py:1075"
-  ],
-  "验证来源不匹配。": [
     "app/service.py:1079"
   ],
+  "验证来源不匹配。": [
+    "app/service.py:1083"
+  ],
   "验证已失效。": [
-    "app/service.py:1082"
+    "app/service.py:1086"
   ],
   "验证已过期，请联系管理员。": [
-    "app/service.py:1084"
+    "app/service.py:1088"
   ],
   "答错次数已用完，请联系管理员或等待超时后重新加入。": [
-    "app/service.py:1087"
-  ],
-  "答案不正确，剩余 {p0} 次。": [
     "app/service.py:1091"
   ],
+  "答案不正确，剩余 {p0} 次。": [
+    "app/service.py:1095"
+  ],
   "机器人缺少解除限制的权限，请联系管理员。": [
-    "app/service.py:1093"
+    "app/service.py:1097"
   ],
   "活动已变化或未开放，请刷新。": [
-    "app/service.py:1168"
-  ],
-  "没有参与者，不能开奖。": [
     "app/service.py:1172"
   ],
+  "没有参与者，不能开奖。": [
+    "app/service.py:1176"
+  ],
   "新人验证未启用：缺少限制成员权限": [
-    "app/service.py:1207"
+    "app/service.py:1211"
   ],
   "无法限制新成员，跳过验证": [
-    "app/service.py:1214"
+    "app/service.py:1218"
   ],
   "新成员": [
-    "app/service.py:1233"
+    "app/service.py:1237"
   ],
   "验证题发送失败，尝试解除限制": [
-    "app/service.py:1240"
+    "app/service.py:1244"
   ],
   "OCR违禁词": [
-    "app/service.py:1642",
-    "app/service.py:1632",
-    "app/service.py:1638"
+    "app/service.py:1646",
+    "app/service.py:1636",
+    "app/service.py:1642"
   ],
   "无法读取管理员名单（跳过本次自动过滤）: %s": [
     "app/service.py:197"
@@ -2049,95 +2057,95 @@
     "app/service.py:377"
   ],
   "运行中": [
-    "app/service.py:621"
+    "app/service.py:625"
   ],
   "⬅️ 返回公告列表": [
-    "app/service.py:637"
+    "app/service.py:641"
   ],
   "每次请输入 1–80 条，以逗号或换行分隔": [
-    "app/service.py:653"
+    "app/service.py:657"
   ],
   "请输入：违禁词 | 完整允许文本（例如：广告 | 学校广告设计）": [
-    "app/service.py:671"
+    "app/service.py:675"
   ],
   "允许文本必须包含要豁免的违禁词": [
-    "app/service.py:673"
+    "app/service.py:677"
   ],
   "🧪 测试结果：": [
-    "app/service.py:685"
+    "app/service.py:689"
   ],
   "🆔 你的 Telegram 数字ID：{p0}": [
-    "app/service.py:715"
+    "app/service.py:719"
   ],
   "转账按钮格式不正确": [
-    "app/service.py:752"
+    "app/service.py:756"
   ],
   "成员身份未确认、已离群或验证未完成，转账不能执行": [
-    "app/service.py:768"
+    "app/service.py:772"
   ],
   "✅ 转账成功": [
-    "app/service.py:776"
+    "app/service.py:780"
   ],
   "❌ 转账已取消": [
-    "app/service.py:777"
+    "app/service.py:781"
   ],
   "⏳ 确认超时，未扣除积分": [
-    "app/service.py:778"
+    "app/service.py:782"
   ],
   "{p0}\n发起人：{p1}\n积分变动仅限群内虚拟积分。": [
-    "app/service.py:785"
+    "app/service.py:789"
   ],
   "防刷屏按钮参数无效": [
-    "app/service.py:846"
+    "app/service.py:850"
   ],
   "违禁词按钮参数无效": [
-    "app/service.py:902"
+    "app/service.py:906"
   ],
   "未知违禁词管理操作": [
-    "app/service.py:958"
+    "app/service.py:962"
   ],
   "数字设置按钮参数无效": [
-    "app/service.py:983"
+    "app/service.py:987"
   ],
   "没有此数字设置项": [
-    "app/service.py:988"
+    "app/service.py:992"
   ],
   "不允许自定义按钮变化量": [
-    "app/service.py:994"
+    "app/service.py:998"
   ],
   "范围必须在 {p0}–{p1} 之间": [
-    "app/service.py:999"
+    "app/service.py:1003"
   ],
   "验证参数错误。": [
-    "app/service.py:1073"
+    "app/service.py:1077"
   ],
   "集中入群保护触发，新加入成员需完成验证": [
-    "app/service.py:1140"
+    "app/service.py:1144"
   ],
   "暂时无法核实候选成员，未开奖，请稍后重试。": [
-    "app/service.py:1181",
-    "app/service.py:1183",
-    "app/service.py:1179"
+    "app/service.py:1185",
+    "app/service.py:1187",
+    "app/service.py:1183"
   ],
   "防刷屏": [
-    "app/service.py:1284",
-    "app/service.py:1492",
-    "app/service.py:1485"
+    "app/service.py:1288",
+    "app/service.py:1496",
+    "app/service.py:1489"
   ],
   "自动删除外部频道发言": [
-    "app/service.py:1388"
+    "app/service.py:1392"
   ],
   "自动删除（{p0}）": [
-    "app/service.py:1460"
+    "app/service.py:1464"
   ],
   "🔎 OCR待审核 消息 {p0}：命中 {p1} / 可信度 {p2:.0f}": [
-    "app/service.py:1634"
+    "app/service.py:1638"
   ],
   "🔎 OCR自动删除消息 {p0}：命中 {p1} / 可信度 {p2:.0f}": [
-    "app/service.py:1648"
+    "app/service.py:1652"
   ],
   "🆔 频道 ID：{p0}": [
-    "app/service.py:1671"
+    "app/service.py:1675"
   ],
   "⚙️ 返回群组设置": [
     "app/service.py:328"
@@ -2160,75 +2168,75 @@
     "app/service.py:417"
   ],
   "✅ 确认删除": [
-    "app/service.py:626"
+    "app/service.py:630"
   ],
   "🗑 删除": [
-    "app/service.py:633"
+    "app/service.py:637"
   ],
   "每条违禁词应为 2–80 字，未保存任何内容": [
-    "app/service.py:658"
+    "app/service.py:662"
   ],
   "没有命中违禁词": [
-    "app/service.py:685"
+    "app/service.py:689"
   ],
   "暂时无法核验群成员身份，请重试": [
-    "app/service.py:765"
+    "app/service.py:769"
   ],
   "防刷屏状态参数无效": [
-    "app/service.py:851"
+    "app/service.py:855"
   ],
   "当前已经是此状态": [
-    "app/service.py:854"
+    "app/service.py:858"
   ],
   "机器人缺少删除消息的权限": [
-    "app/service.py:857"
+    "app/service.py:861"
   ],
   "防刷屏处罚：仅删除": [
-    "app/service.py:874"
+    "app/service.py:878"
   ],
   "防刷屏处罚：删除并临时禁言": [
-    "app/service.py:875"
+    "app/service.py:879"
   ],
   "防刷屏提醒：关闭": [
-    "app/service.py:889"
+    "app/service.py:893"
   ],
   "防刷屏提醒：约 {p0} 秒": [
-    "app/service.py:890"
+    "app/service.py:894"
   ],
   "页码超出范围": [
-    "app/service.py:910"
+    "app/service.py:914"
   ],
   "开关参数无效": [
-    "app/service.py:918"
+    "app/service.py:922"
   ],
   "机器人缺少删除消息权限": [
-    "app/service.py:922",
-    "app/service.py:887",
-    "app/service.py:945"
+    "app/service.py:926",
+    "app/service.py:891",
+    "app/service.py:949"
   ],
   "处罚：仅删除": [
-    "app/service.py:936"
+    "app/service.py:940"
   ],
   "处罚：删除并禁言": [
-    "app/service.py:936"
+    "app/service.py:940"
   ],
   "删除提醒：关闭": [
-    "app/service.py:947"
+    "app/service.py:951"
   ],
   "删除提醒：约 {p0} 秒": [
-    "app/service.py:947"
+    "app/service.py:951"
   ],
   "设置变化量无效": [
-    "app/service.py:992"
+    "app/service.py:996"
   ],
   "任务编号无效": [
-    "app/service.py:1016"
+    "app/service.py:1020"
   ],
   "已提交": [
-    "app/service.py:1358"
+    "app/service.py:1362"
   ],
   "失败": [
-    "app/service.py:1358"
+    "app/service.py:1362"
   ],
   "✅ 启用": [
     "app/service.py:374",
@@ -2269,51 +2277,51 @@
     "app/service.py:415"
   ],
   "▶️ 恢复": [
-    "app/service.py:631"
+    "app/service.py:635"
   ],
   "⏸ 暂停": [
-    "app/service.py:631"
+    "app/service.py:635"
   ],
   "添加": [
-    "app/service.py:665"
+    "app/service.py:669"
   ],
   "✅ 数据库连接正常，机器人运行中。": [
-    "app/service.py:720"
+    "app/service.py:724"
   ],
   "启用": [
-    "app/service.py:859",
-    "app/service.py:924"
+    "app/service.py:863",
+    "app/service.py:928"
   ],
   "无效的防刷屏处罚方式": [
-    "app/service.py:863"
+    "app/service.py:867"
   ],
   "当前已经是此处罚方式": [
-    "app/service.py:865"
+    "app/service.py:869"
   ],
   "提醒时间只能选关闭/10/30/60秒": [
-    "app/service.py:883",
-    "app/service.py:943"
+    "app/service.py:887",
+    "app/service.py:947"
   ],
   "当前已经是此提醒设置": [
-    "app/service.py:885"
+    "app/service.py:889"
   ],
   "页码无效": [
-    "app/service.py:908"
+    "app/service.py:912"
   ],
   "处罚选项无效": [
-    "app/service.py:927"
+    "app/service.py:931"
   ],
   "拦截新加入的第三方机器人": [
-    "app/service.py:1115"
+    "app/service.py:1119"
   ],
   "新朋友": [
-    "app/service.py:1162"
+    "app/service.py:1166"
   ],
   "新人验证超时，已移出群（允许重新加入）": [
-    "app/service.py:1261"
+    "app/service.py:1265"
   ],
   "{p0}违规，禁言 {p1} 分钟": [
-    "app/service.py:1485"
+    "app/service.py:1489"
   ],
   " 秒后撤回": [
     "app/service.py:374",
@@ -2334,31 +2342,31 @@
     "app/service.py:387"
   ],
   "请发送 /start 打开中文群管理面板，或 /help 查看命令。": [
-    "app/service.py:738"
+    "app/service.py:742"
   ],
   "禁言仅支持超级群组": [
-    "app/service.py:868"
-  ],
-  "需要删除消息与限制成员两项权限": [
     "app/service.py:872"
   ],
+  "需要删除消息与限制成员两项权限": [
+    "app/service.py:876"
+  ],
   "无效的提醒时间": [
-    "app/service.py:881"
+    "app/service.py:885"
   ],
   "禁言只支持超级群组": [
-    "app/service.py:930"
-  ],
-  "机器人需要删除消息和限制成员权限": [
     "app/service.py:934"
   ],
+  "机器人需要删除消息和限制成员权限": [
+    "app/service.py:938"
+  ],
   "提醒时间格式无效": [
-    "app/service.py:941"
+    "app/service.py:945"
   ],
   "新成员昵称过长，限制发言30分钟": [
-    "app/service.py:1155"
+    "app/service.py:1159"
   ],
   "10分钟内违规 {p0} 次，自动禁言 {p1} 分钟": [
-    "app/service.py:1511"
+    "app/service.py:1515"
   ],
   "✅ 生效中": [
     "app/service.py:407"
@@ -2370,16 +2378,16 @@
     "app/service.py:430"
   ],
   "⏰ 编辑已过期，请重新进入群管理面板。": [
-    "app/service.py:725"
+    "app/service.py:729"
   ],
   "⚠️ 当前已无该群管理权限，未修改任何规则。": [
-    "app/service.py:728"
+    "app/service.py:732"
   ],
   "🔗 链接防护\n当前：{p0}\n识别普通网址、隐藏 text_link 和常见 Telegram 链接；打开智能反垃圾后还会识别部分 t[.]me 等变体。\n域名白名单：/allowdomain example.com\n移除：/deldomain example.com": [
     "app/service.py:441"
   ],
   "⚠️ {p0}\n如需重试，请重新点击编辑按钮。": [
-    "app/service.py:733"
+    "app/service.py:737"
   ],
   "🔁 转发保护\n开启后自动删除普通成员转发的消息，管理员不受影响。": [
     "app/service.py:445"
@@ -2562,17 +2570,20 @@
   "暂无历史": [
     "app/service.py:556"
   ],
-  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 审核日志（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": [
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": [
     "app/service.py:561"
   ],
   "暂无上架商品": [
     "app/service.py:548"
   ],
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": [
+    "app/service.py:566"
+  ],
   "📈 最近7天（包含今天）\n消息 {p0} 条\n删除 {p1} 条\n入群 {p2} 人\n处罚 {p3} 次": [
-    "app/service.py:565"
+    "app/service.py:569"
   ],
   "\n历史明细最多保留 30 天。": [
-    "app/service.py:570"
+    "app/service.py:574"
   ],
   "#{p0} {p1} · {p2} 分 · 余{p3}": [
     "app/service.py:548"
@@ -2584,25 +2595,25 @@
     "app/service.py:561"
   ],
   "🏆 最近7天活跃排行（仅记录用户 ID）\n": [
-    "app/service.py:568"
+    "app/service.py:572"
   ],
   "\n\n在群内使用 /schedule 查看新增、暂停和删除的详细用法。": [
-    "app/service.py:575"
+    "app/service.py:579"
   ],
   "暂无非命令消息": [
-    "app/service.py:569"
-  ],
-  "📅 定时公告\n": [
     "app/service.py:573"
   ],
+  "📅 定时公告\n": [
+    "app/service.py:577"
+  ],
   "该功能暂不可用。": [
-    "app/service.py:583"
+    "app/service.py:587"
   ],
   "暂无定时任务": [
-    "app/service.py:574"
+    "app/service.py:578"
   ],
   "{p0}. {p1}：{p2} 条": [
-    "app/service.py:569"
+    "app/service.py:573"
   ],
   "📚 分类违禁词库 · {p0}类 / {p1}条去重短语\n原创招揽组合与有许可证的公开词库；没有其他机器人的私有词库或实测命中率数据。\n所有分类默认关闭，建议先观察，再按群主题逐类启用处罚。\n分类观察只记录，不覆盖链接、刷屏等原有处罚；全局观察优先于所有分类。\n自定义同名词优先；关闭总违禁词开关后，分类也不执行。\n本群排除 {p2} 条（前20条）：": [
     "app/word_ui.py:22"
@@ -3447,6 +3458,18 @@
   ],
   "⬅️ 返回本功能": [
     "app/feature_help.py:489"
+  ],
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": [
+    "app/ocr.py:31"
+  ],
+  "关闭（off）": [
+    "app/ocr.py:27"
+  ],
+  "仅审核（review）": [
+    "app/ocr.py:28"
+  ],
+  "自动删除（delete）": [
+    "app/ocr.py:29"
   ],
   "刷单返佣与任务骗局": [
     "app/wordlists/curated.json:task_scam:name"

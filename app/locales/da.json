@@ -1099,5 +1099,20 @@
   "英文诈骗与垃圾推广": "Engelsk svindel og spam",
   "英文招揽短语；金融、安全或反诈群组应先观察，避免误删引用。": "Engelske opfordringssætninger. Start med observationstilstand i finans-, sikkerheds- og anti-svindelgrupper for at undgå at slette tilbud.",
   "两字短词（严格）": "Søgeord på to tegn (strenge)",
-  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Matcher søgeord med to tegn overalt i en besked, inklusive svindeladvarsler, nyheder og uddannelsescitater. Deaktiveret som standard; observere først. Aktiver variantregistrering separat for homofoner og opdelte tegn."
+  "两字词按包含识别，反诈、新闻、科普引用也会命中。独立默认关闭，建议先观察；同音和拆字需另开中文变体识别。": "Matcher søgeord med to tegn overalt i en besked, inklusive svindeladvarsler, nyheder og uddannelsescitater. Deaktiveret som standard; observere først. Aktiver variantregistrering separat for homofoner og opdelte tegn.",
+  "✅ 已保存：{p0}": "✅ Gemt: {p0}",
+  "OCR模式：{p0} → {p1}\n{p2}": "OCR tilstand: {p0} → {p1}\n{p2}",
+  "确认后停止本群图片文字扫描。": "Efter bekræftelse skal du stoppe med at scanne fototekst i denne gruppe.",
+  "OCR引擎不可用，未更改群模式。请按页面步骤启用。": "OCR motoren er ikke tilgængelig. Gruppetilstanden blev ikke ændret. Følg opsætningstrinnene på denne side.",
+  "当前已是{p0}，无需重复保存。": "Allerede indstillet til {p0}; ingen ændring er nødvendig.",
+  "仅记录命中到防护记录，不删除图片；日志群为可选。": "Registrerer kampe i beskyttelsesposter uden at slette billeder. En separat loggruppe er valgfri.",
+  "自动删除可能误判，建议先使用仅审核。": "Automatisk sletning kan give falske positiver. Start kun med anmeldelse.",
+  "OCR模式已变化，请返回功能页面重新选择。": "OCR tilstanden er ændret. Vend tilbage til funktionssiden og vælg igen.",
+  "🔎 OCR 已设为 {p0}。仅审核写入防护记录，不删除；已设置日志群时同时发送日志。": "🔎 OCR indstillet til {p0}. Gennemgå kun registrerer kampe uden sletning. Hvis en loggruppe er konfigureret, sendes rapporter også dertil.",
+  "🔎 图片文字 OCR 模式：{p0}\n引擎：{p1}\n最低可信度：{p2}\n仅扫描普通成员的 Telegram 照片，使用本机 Tesseract。\n命中至少 4 字的违禁词才记录或处理，不识别二维码。\n\n/ocr review 仅审核，写入防护记录（推荐）\n/ocr delete 高置信自动删除（误判风险）\n/ocr off 关闭 /ocrconfidence 70 设置可信度\nOCR_ENABLED=1 且容器安装 Tesseract 才能运行。": "🔎 Fototekst OCR tilstand: {p0}\nMotor: {p1}\nMinimum tillid: {p2}\nScanner almindelige medlemmers Telegram-billeder ved hjælp af lokale Tesseract.\nKun søgeordsmatches på mindst 4 tegn registreres eller behandles; QR koder genkendes ikke.\n\n/ocr review — kun gennemgang, gem beskyttelsesposter (anbefales)\n/ocr delete — automatisk sletning med høj sikkerhed (falsk-positiv risiko)\n/ocr off — deaktiver; /ocrconfidence 70 — sæt tillid\nKræver OCR_ENABLED=1 og Tesseract installeret i containeren.",
+  "\n⚠️ 违禁词总开关已关闭，OCR暂不检查关键词。": "\n⚠️ Søgeordsfilteret er slået fra. OCR søgeordskontrol er i øjeblikket deaktiveret.",
+  "OCR引擎未启用或未安装。\n在服务器SSH运行 gg ocr，选择1，等待构建并重启机器人。\n之后回到本页选择“仅审核”或“自动删除”。安装引擎不会自动开启各群OCR。": "OCR motoren er deaktiveret eller ikke installeret.\nKør gg ocr i din server SSH terminal, vælg 1, og vent på, at build og bot genstartes.\nVend derefter tilbage hertil og vælg Kun gennemgang eller Automatisk sletning. Installation af motoren aktiverer ikke OCR i individuelle grupper.",
+  "关闭（off）": "Fra (off)",
+  "仅审核（review）": "Kun kontrol (review)",
+  "自动删除（delete）": "Automatisk sletning (delete)"
 }
