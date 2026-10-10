@@ -169,9 +169,36 @@ bash ~/groupguard/scripts/server-manager.sh backup
 
 ## 十、故障检查
 
+### Docker 安装失败及重复提示
+
+旧版菜单如果反复显示“未发现 Docker，准备按照 Docker 官方 apt 软件源进行安装”，说明 Docker 没有安装成功。旧版使用的 apt-get -qq 不会显示正常安装进度，而且菜单对失败的处理不够明确。**先按 Ctrl+C 停止，升级修复后的脚本再运行**：
+
+~~~bash
+cd ~/groupguard
+git pull --ff-only origin main
+bash scripts/server-manager.sh install
+~~~
+
+修复后会依次显示 **1/7 更新系统 apt → 2/7 安装 HTTPS/证书 → 3/7 创建密钥目录 → 4/7 Docker GPG 密钥 → 5/7 Docker 软件源 → 6/7 更新 Docker apt 索引 → 7/7 安装 Docker Engine/Compose**。失败时显示错误步骤及退出码，并立即停止；不要反复进入菜单。
+
+如果再次失败，复制以下自检命令的输出（**请先隐藏服务器 IP、代理密码等敏感内容**）：
+
+~~~bash
+cat /etc/os-release
+uname -m
+command -v docker || true
+sudo apt-get update
+curl -I --connect-timeout 10 --max-time 20 https://download.docker.com/
+~~~
+
+对于已经安装 Docker CLI 但缺少 Compose V2 的服务器，安装器会主动停止，不会自动替换已有 Docker。Docker 官方安装页：[Ubuntu](https://docs.docker.com/engine/install/ubuntu/) / [Debian](https://docs.docker.com/engine/install/debian/)。
+
+如果服务器上 Docker 官方源配置已经损坏，请先查看报错及 /etc/apt/sources.list.d/docker.sources，不要直接删除其他正在使用的 Docker 数据或强制运行 apt purge。
+
 | 症状 | 可能原因与排查 |
 |---|---|
 | GitHub 下载失败 | 检查公开仓库 URL、DNS、HTTPS 出站连接，以及服务器能否访问 github.com 与 raw.githubusercontent.com |
+| Docker 反复显示安装开始 | 旧脚本未中止 apt 错误；按 Ctrl+C 退出，按上面命令拉取修复版并查看具体失败步骤 |
 | Token 验证失败 | Token 格式不对；重新运行菜单 5 输入，输入时内容不会显示 |
 | Docker 构建失败 | 服务器无法访问 Docker Hub、磁盘空间不足或 Docker 官方 apt 仓库暂不可用 |
 | Telegram getMe 失败 | 服务器出口无法访问 api.telegram.org 或 Bot Token 错误 |

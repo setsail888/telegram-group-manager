@@ -145,6 +145,126 @@ exit 0
         self.assertIn("缺少 Compose V2", result.stderr)
         self.assertFalse(self.log.exists())
 
+    def test_docker_apt_index_failure_stops_with_reason(self):
+        self.provision_env()
+        result = self.run_source("""
+docker_available() { return 1; }
+check_os() {
+  ID=ubuntu
+  DOCKER_APT_SUITE=noble
+  DOCKER_APT_ARCH=amd64
+}
+root() {
+  printf 'MOCK ROOT: %s\\n' "$*" >&2
+  return 100
+}
+install_docker
+echo 'THIS MUST NOT PRINT'
+""")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("1/7 更新系统 apt 软件包索引", result.stdout + result.stderr)
+        self.assertIn("退出码 100", result.stderr)
+        self.assertIn("不要反复选择安装", result.stderr)
+        self.assertNotIn("THIS MUST NOT PRINT", result.stdout)
+        self.assertNotIn("Docker Engine 和 Compose V2 的软件包安装已成功",
+                         result.stdout)
+
+    def test_docker_failed_install_never_starts_groupbot(self):
+        result = self.run_source("""
+docker_available() { return 1; }
+check_os() {
+  ID=debian
+  DOCKER_APT_SUITE=bookworm
+  DOCKER_APT_ARCH=amd64
+}
+root() { return 100; }
+(install) || warn "安装失败，等待人工检查 apt 错误"
+echo "SHELL_CAN_RETURN_TO_MENU"
+""")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1/7 更新系统 apt 软件包索引", result.stderr)
+        self.assertIn("退出码 100", result.stderr)
+        self.assertIn("安装失败，等待人工检查 apt 错误", result.stderr)
+        self.assertIn("SHELL_CAN_RETURN_TO_MENU", result.stdout)
+        self.assertFalse((self.project / ".env").exists())
+        self.assertFalse(self.log.exists())
+
+    def test_docker_gpg_download_failure_stops_with_reason(self):
+        self.provision_env()
+        result = self.run_source("""
+docker_available() { return 1; }
+check_os() {
+  ID=debian
+  DOCKER_APT_SUITE=trixie
+  DOCKER_APT_ARCH=amd64
+}
+root() {
+  printf 'MOCK ROOT: %s\\n' "$*" >&2
+  if [[ "$1" == curl ]]; then return 60; fi
+  return 0
+}
+install_docker
+echo 'THIS MUST NOT PRINT'
+""")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("4/7 从 Docker 官网下载 GPG 密钥", result.stdout + result.stderr)
+        self.assertIn("退出码 60", result.stderr)
+        self.assertNotIn("THIS MUST NOT PRINT", result.stdout)
+
+    def test_docker_package_install_failure_does_not_claim_success(self):
+        self.provision_env()
+        result = self.run_source("""
+docker_available() { return 1; }
+check_os() {
+  ID=ubuntu
+  DOCKER_APT_SUITE=noble
+  DOCKER_APT_ARCH=amd64
+}
+root() {
+  if [[ "$1" == tee ]]; then cat >/dev/null; return 0; fi
+  if [[ "$*" == *"docker-ce docker-ce-cli"* ]]; then return 100; fi
+  return 0
+}
+install_docker
+echo 'THIS MUST NOT PRINT'
+""")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("7/7 安装 Docker Engine、Buildx 与 Compose V2",
+                      result.stdout + result.stderr)
+        self.assertIn("退出码 100", result.stderr)
+        self.assertNotIn("Docker Engine 和 Compose V2 的软件包安装已成功",
+                         result.stdout)
+        self.assertNotIn("THIS MUST NOT PRINT", result.stdout)
+
+    def test_docker_clean_install_simulated_completes_all_steps(self):
+        self.provision_env()
+        result = self.run_source("""
+docker_available() { [[ -f "$HOME/docker-installed" ]]; }
+check_os() {
+  ID=ubuntu
+  DOCKER_APT_SUITE=noble
+  DOCKER_APT_ARCH=amd64
+}
+root() {
+  if [[ "$1" == tee ]]; then cat >/dev/null; return 0; fi
+  if [[ "$*" == *"docker-ce docker-ce-cli"* ]]; then
+    touch "$HOME/docker-installed"
+  fi
+  return 0
+}
+install_docker
+""")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("7/7 安装 Docker Engine、Buildx 与 Compose V2",
+                      result.stdout + result.stderr)
+        self.assertIn("Docker Engine、Compose V2 和守护进程检查通过",
+                      result.stdout)
+
+    def test_menu_launches_install_in_isolated_bash(self):
+        source = (PROJECT / "scripts/server-manager.sh").read_text()
+        self.assertIn('bash "${APP_DIR}/scripts/server-manager.sh" install', source)
+        self.assertNotIn('1) (install) || warn', source)
+
     def test_uninstall_default_never_purges_volume(self):
         self.provision_env()
         result = self.run_source(

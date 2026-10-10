@@ -30,6 +30,26 @@ root() {
   fi
 }
 
+# Do not depend on shell errexit here: the interactive menu historically ran
+# (install) || warn, which suppresses Bash -e throughout the called function.
+# Every fallible installation step must fail explicitly, with visible output.
+docker_available() {
+  command -v docker >/dev/null 2>&1
+}
+
+docker_step() {
+  local stage="$1" rc
+  shift
+  # stderr keeps progress visible when a command (e.g. tee) redirects stdout.
+  info "Docker 安装步骤：${stage}" >&2
+  if "$@"; then
+    return 0
+  else
+    rc="$?"
+    die "Docker 安装失败：${stage}（退出码 ${rc}）。请查看上方的具体报错（apt 软件源、网络、权限或软件包冲突），不要反复选择安装。"
+  fi
+}
+
 dc() {
   (cd "${APP_DIR}" && root docker compose "$@")
 }
@@ -137,16 +157,31 @@ check_os() {
     debian|ubuntu) ;;
     *) die "自动安装 Docker 仅支持 Debian / Ubuntu；检测到 ${ID}" ;;
   esac
-  [[ -n "${VERSION_CODENAME:-}" ]] ||
-    die "系统缺少 VERSION_CODENAME，不自动修改 apt 源"
+  command -v apt-get >/dev/null 2>&1 ||
+    die "当前系统缺少 apt-get，无法按 Debian / Ubuntu 流程安装 Docker"
+  command -v dpkg >/dev/null 2>&1 ||
+    die "当前系统缺少 dpkg，无法判断 Docker 安装包架构"
+  local distro_suite
+  distro_suite="${VERSION_CODENAME:-}"
+  if [[ "${ID}" == ubuntu ]]; then
+    distro_suite="${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}"
+  fi
+  [[ -n "${distro_suite}" ]] ||
+    die "系统缺少 Ubuntu/Debian 发行版代号，无法安全添加 Docker 官方软件源"
+  [[ "${distro_suite}" =~ ^[a-z][a-z0-9-]*$ ]] ||
+    die "系统发行版代号无效，拒绝修改 Docker 官方软件源"
+  DOCKER_APT_SUITE="${distro_suite}"
   local arch
-  arch="$(dpkg --print-architecture)"
+  arch="$(dpkg --print-architecture)" ||
+    die "无法确定 CPU 包架构"
   [[ "${arch}" == amd64 || "${arch}" == arm64 ]] ||
     die "不支持自动安装 Docker 的架构：${arch}"
+  DOCKER_APT_ARCH="${arch}"
+  info "检测到 ${PRETTY_NAME:-${ID}}，Docker 软件源版本：${DOCKER_APT_SUITE}，架构：${arch}"
 }
 
 install_docker() {
-  if command -v docker >/dev/null 2>&1; then
+  if docker_available; then
     if ! docker compose version >/dev/null 2>&1; then
       die "检测到已有 Docker 但缺少 Compose V2：为避免覆盖现有 Docker，请先手动安装 docker-compose-plugin"
     fi
@@ -154,33 +189,47 @@ install_docker() {
   else
     check_os
     info "未发现 Docker，准备按照 Docker 官方 apt 软件源进行安装"
-    root apt-get update -qq
-    root apt-get install -y -qq ca-certificates curl git
-    root install -m 0755 -d /etc/apt/keyrings
-    root curl -fsSL "https://download.docker.com/linux/${ID}/gpg" \
+    docker_step "1/7 更新系统 apt 软件包索引" root apt-get update
+    docker_step "2/7 安装 HTTPS 证书、curl 和 Git" root env DEBIAN_FRONTEND=noninteractive \
+      apt-get install -y ca-certificates curl git
+    docker_step "3/7 创建 Docker apt 密钥目录" root install -m 0755 -d /etc/apt/keyrings
+    docker_step "4/7 从 Docker 官网下载 GPG 密钥（https://download.docker.com）" \
+      root curl --connect-timeout 20 --max-time 90 -fsSL \
+      "https://download.docker.com/linux/${ID}/gpg" \
       -o /etc/apt/keyrings/docker.asc
-    root chmod 0644 /etc/apt/keyrings/docker.asc
-    local arch
-    arch="$(dpkg --print-architecture)"
+    docker_step "4/7 设置 Docker GPG 密钥权限" root chmod 0644 /etc/apt/keyrings/docker.asc
+    if [[ -e /etc/apt/sources.list.d/docker.sources ]] &&
+       ! grep -Eq '^URIs: https://download\.docker\.com/linux/(ubuntu|debian)$' /etc/apt/sources.list.d/docker.sources; then
+      die "发现已存在的自定义 /etc/apt/sources.list.d/docker.sources，为保护已有 Docker 配置不自动覆盖"
+    fi
     {
       printf 'Types: deb\n'
       printf 'URIs: https://download.docker.com/linux/%s\n' "${ID}"
-      printf 'Suites: %s\n' "${VERSION_CODENAME}"
+      printf 'Suites: %s\n' "${DOCKER_APT_SUITE}"
       printf 'Components: stable\n'
-      printf 'Architectures: %s\n' "${arch}"
+      printf 'Architectures: %s\n' "${DOCKER_APT_ARCH}"
       printf 'Signed-By: /etc/apt/keyrings/docker.asc\n'
-    } | root tee /etc/apt/sources.list.d/docker.sources >/dev/null
-    root apt-get update -qq
-    root apt-get install -y -qq docker-ce docker-ce-cli containerd.io \
+    } | docker_step "5/7 配置 Docker 官方 apt 软件源" \
+      root tee /etc/apt/sources.list.d/docker.sources >/dev/null
+    docker_step "6/7 更新 Docker 软件源索引" root apt-get update
+    docker_step "7/7 安装 Docker Engine、Buildx 与 Compose V2" \
+      root env DEBIAN_FRONTEND=noninteractive \
+      apt-get install -y docker-ce docker-ce-cli containerd.io \
       docker-buildx-plugin docker-compose-plugin
-    info "Docker Engine 和 Compose V2 已安装"
+    docker_available ||
+      die "apt 命令运行完毕，但仍找不到 docker 命令，请检查安装输出和 PATH"
+    docker compose version ||
+      die "Docker 已安装但缺少 Compose V2 插件，请检查 apt 安装结果"
+    info "Docker Engine 和 Compose V2 的软件包安装已成功"
   fi
   if ! root docker info >/dev/null 2>&1; then
     if command -v systemctl >/dev/null 2>&1; then
-      root systemctl enable --now docker
+      docker_step "启动并设置 Docker 服务开机自启" root systemctl enable --now docker
     fi
   fi
-  root docker info >/dev/null 2>&1 || die "Docker daemon 未启动或不可用"
+  root docker info >/dev/null 2>&1 ||
+    die "Docker 客户端已经安装，但守护进程不可用。请检查：systemctl status docker 和 journalctl -u docker -n 50 --no-pager"
+  info "✅ Docker Engine、Compose V2 和守护进程检查通过"
 }
 
 ensure_env() {
@@ -426,8 +475,11 @@ menu() {
     printf '%s\n' '======================================================'
     tty_line '请输入序号： ' || break
     case "${REPLY}" in
-      1) (install) || warn "安装未成功，原有数据已保留" ;;
-      2) (update) || warn "更新未成功，原有数据已保留" ;;
+      # New Bash process: (install) || warn disables errexit inside install.
+      1) bash "${APP_DIR}/scripts/server-manager.sh" install ||
+           warn "安装未成功，请查看上方红色错误和 apt/curl 输出，排查原因后再重试" ;;
+      2) bash "${APP_DIR}/scripts/server-manager.sh" update ||
+           warn "更新未成功，保留原有数据；请查看上方具体错误后再重试" ;;
       3) (show_status) || : ;;
       4) (show_logs) || : ;;
       5) (configure_action) || : ;;

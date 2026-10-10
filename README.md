@@ -20,6 +20,16 @@ bash -c 'set -euo pipefail; command -v curl >/dev/null 2>&1 || { if [ "$(id -u)"
 bash ~/groupguard/scripts/server-manager.sh
 ~~~
 
+**如果之前安装时一直重复显示“未发现 Docker”**：先按 Ctrl+C 退出旧菜单，再通过 SSH 执行下面三行恢复安装（无需清空目录，不会覆盖 .env 或数据库）：
+
+~~~bash
+cd ~/groupguard
+git pull --ff-only origin main
+bash scripts/server-manager.sh install
+~~~
+
+新版 Docker 安装会显示分步骤执行和真正的 apt/curl 错误；失败会立即停止并显示退出码。请勿反复输入菜单序号 1，也不要为了排查而卸载服务器已有的 Docker。进一步排查详见 [Docker 安装失败](docs/server-one-click.md#docker-安装失败及重复提示)。
+
 安装目录默认为 **~/groupguard**；数据库在 Docker 命名卷；备份默认在 **~/groupguard-backups**。**卸载默认保留数据，删除积分数据库必须再输入完整二次确认口令。**
 
 完整安装说明、BotFather 设置、日志排障和手动克隆方式见 [服务器一键部署指南](docs/server-one-click.md)。公开仓库的源代码不包含你服务器里的真实 .env、Bot Token 和数据库；**仍然不要把密钥上传到 GitHub**。
