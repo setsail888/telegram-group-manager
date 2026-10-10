@@ -72,6 +72,7 @@ PAGE_NUMBERS = {
               ("media_flood_limit", "媒体连发条数", 1),
               ("media_flood_window", "媒体窗口（秒）", 5)),
     "members": (("name_length_limit", "允许昵称最大长度", 5),),
+    "wordpenalty": (("word_mute_minutes", "违禁词禁言分钟", 5),),
 }
 WORD_OPERATIONS = {"add", "del", "except", "unexcept", "test"}
 
@@ -99,6 +100,7 @@ class GroupBot:
         self._reply_time = defaultdict(float)
         self._public_command_time = {}
         self._word_wizards = {}  # user_id -> (chat_id, operation, expiry)
+        self._last_word_notice = {}  # chat_id -> monotonic time; prevent notice spam
 
     def send(self, chat_id, text, **kwargs):
         return self.api.safe("sendMessage", chat_id=chat_id, text=str(text)[:4000], **kwargs)
@@ -252,12 +254,48 @@ class GroupBot:
             ])
         return keyboard
 
+    def _word_navigation(self, chat_id):
+        """Always give users an exit from one-shot private keyword editing."""
+        return {"inline_keyboard": [[
+            self._button("⬅️ 返回违禁词管理", f"v:{chat_id}:words"),
+            self._button("⚙️ 返回群组设置", f"g:{chat_id}"),
+        ]]}
+
+    def _private_word_list(self, user_id, chat_id, page=0, message_id=None):
+        """Separate, bounded list; the main keyword page never shows entries."""
+        if not self.is_admin(chat_id, user_id):
+            return self._edit_or_send(user_id, message_id, "没有权限。")
+        count = self.store.filter_count(chat_id, "word")
+        last_page = max(0, (count - 1) // 8)
+        page = min(last_page, page)
+        rows = self.store.filter_page(chat_id, "word", page, page_size=8)
+        listing = "\n".join(
+            f"{page * 8 + i}. {str(row['value'])[:80]}"
+            for i, row in enumerate(rows, 1)) or "暂无违禁词"
+        keyboard = []
+        navigation = []
+        if page > 0:
+            navigation.append(self._button("◀️ 上一页", f"wl:{chat_id}:{page-1}"))
+        if page < last_page:
+            navigation.append(self._button("下一页 ▶️", f"wl:{chat_id}:{page+1}"))
+        if navigation:
+            keyboard.append(navigation)
+        keyboard.append([self._button("⬅️ 返回违禁词管理", f"v:{chat_id}:words")])
+        return self._edit_or_send(
+            user_id, message_id,
+            f"📋 违禁词列表 · 共 {count} 条\n"
+            f"第 {page + 1}/{last_page + 1} 页\n\n{listing}",
+            keyboard)
+
     def _private_view(self, user_id, chat_id, what, message_id):
         if not self.is_admin(chat_id, user_id):
             return self._edit_or_send(user_id, message_id, "没有权限。")
         keyboard = []
         conf = self.store.settings(chat_id)
-        keyboard.extend(self._settings_controls(chat_id, what, conf))
+        # The keyword page has its own compact button layout, matching the
+        # reference bot, rather than an expanded rule list.
+        if what != "words":
+            keyboard.extend(self._settings_controls(chat_id, what, conf))
         if what == "spam":
             text = (
                 "🛡️ 智能反垃圾\n"
@@ -334,21 +372,63 @@ class GroupBot:
                                   ("🧩 验证", "verify_enabled"))) +
                     "\n\n设置均仅作用于当前群。")
         elif what == "words":
-            # Keep this message short regardless of rule count. The actual
-            # keyword list is deliberately never rendered in the private panel.
             words_total = self.store.filter_count(chat_id, "word")
             exceptions_total = self.store.filter_count(chat_id, "word_exception")
+            enabled = conf["word_filter_enabled"]
+            punishment = ("仅删除消息" if conf["word_penalty"] == "delete"
+                          else f"删除并禁言 {conf['word_mute_minutes']} 分钟")
+            reminder = (f"{conf['word_notice_seconds']} 秒后撤回"
+                        if conf["word_notice_seconds"] else "关闭（静默）")
             text = (
-                "⛔ 违禁词管理\n"
-                f"已添加：{words_total} 条 ｜ 精确例外：{exceptions_total} 条\n"
-                "使用下方按钮管理；支持一次添加多个违禁词。"
+                "⛔ 违禁词\n\n"
+                f"状态：{'✅ 启用' if enabled else '⭕ 关闭'}\n"
+                f"惩罚：{punishment}\n"
+                f"删除提醒：{reminder}\n"
+                f"规则：{words_total} 条 · 精确例外：{exceptions_total} 条"
             )
             keyboard.extend([
+                [self._button("✅ 启用", f"ws:{chat_id}:on"),
+                 self._button("⭕ 关闭", f"ws:{chat_id}:off")],
                 [self._button("➕ 添加违禁词", f"w:{chat_id}:add"),
                  self._button("➖ 删除违禁词", f"w:{chat_id}:del")],
+                [self._button("📋 违禁词列表", f"wl:{chat_id}:0")],
+                [self._button("⚖️ 惩罚", f"v:{chat_id}:wordpenalty"),
+                 self._button("🕒 删除提醒", f"v:{chat_id}:wordnotice")],
+                [self._button(
+                    f"{'✅' if conf['word_loose_match'] else '⭕'} 🔎 拆字违禁词",
+                    f"t:{chat_id}:word_loose_match:words")],
                 [self._button("🛡️ 添加精确例外", f"w:{chat_id}:except"),
                  self._button("❌ 删除精确例外", f"w:{chat_id}:unexcept")],
                 [self._button("🧪 测试关键词匹配", f"w:{chat_id}:test")],
+            ])
+        elif what == "wordpenalty":
+            text = (
+                "⚖️ 违禁词处罚\n\n"
+                f"当前：{'仅删除消息' if conf['word_penalty'] == 'delete' else '删除消息并临时禁言'}\n"
+                f"禁言时长：{conf['word_mute_minutes']} 分钟\n"
+                "仅处理命中违禁词的普通群成员；默认仅删除，保持静默。\n"
+                "启用禁言需要机器人具有「限制成员」权限，并且群是超级群。"
+            )
+            keyboard.extend([
+                [self._button("✅ 仅删除", f"wp:{chat_id}:delete"),
+                 self._button("🔇 删除并禁言", f"wp:{chat_id}:mute")],
+                [self._button("➖ 5 分钟", f"n:{chat_id}:word_mute_minutes:-5:wordpenalty"),
+                 self._button("➕ 5 分钟", f"n:{chat_id}:word_mute_minutes:+5:wordpenalty")],
+                [self._button("⬅️ 返回违禁词", f"v:{chat_id}:words")],
+            ])
+        elif what == "wordnotice":
+            text = (
+                "🕒 违禁词删除提醒\n\n"
+                f"当前：{'关闭（不在群内通知）' if conf['word_notice_seconds'] == 0 else str(conf['word_notice_seconds']) + ' 秒后自动撤回'}\n"
+                "仅当确实成功删除违禁词消息后，才在群内发送简短提醒。\n"
+                "默认关闭、静默处理；开启后将尽量在设定时间后撤回提醒。"
+            )
+            keyboard.extend([
+                [self._button("🔕 关闭", f"wn:{chat_id}:0"),
+                 self._button("10 秒", f"wn:{chat_id}:10")],
+                [self._button("30 秒", f"wn:{chat_id}:30"),
+                 self._button("60 秒", f"wn:{chat_id}:60")],
+                [self._button("⬅️ 返回违禁词", f"v:{chat_id}:words")],
             ])
         elif what == "domains":
             domains = [r["value"] for r in self.store.filters(chat_id, "domain")]
@@ -610,8 +690,9 @@ class GroupBot:
             return
         cmd = text.split(maxsplit=1)[0].split("@")[0].lower()
         if cmd == "/cancel" and uid in self._word_wizards:
-            self._word_wizards.pop(uid, None)
-            return self.send(uid, "✅ 已取消本次编辑。")
+            chat_id, _operation, _expires = self._word_wizards.pop(uid)
+            return self.send(uid, "✅ 已取消本次编辑。",
+                             reply_markup=self._word_navigation(chat_id))
         if cmd in ("/start", "/groups", "/panel"):
             self._word_wizards.pop(uid, None)
             self._private_groups(uid)
@@ -622,16 +703,20 @@ class GroupBot:
             self.send(uid, "✅ 数据库连接正常，机器人运行中。")
         elif uid in self._word_wizards and not message.get("sender_chat"):
             chat_id, operation, expiry = self._word_wizards.pop(uid)
+            keyboard = self._word_navigation(chat_id)
             if time.monotonic() >= expiry:
-                return self.send(uid, "⏰ 编辑已过期，请重新进入群管理面板。")
+                return self.send(uid, "⏰ 编辑已过期，请重新进入群管理面板。",
+                                 reply_markup=keyboard)
             if not self.store.chat(chat_id) or not self.is_admin(chat_id, uid):
-                return self.send(uid, "⚠️ 当前已无该群管理权限，未修改任何规则。")
+                return self.send(uid, "⚠️ 当前已无该群管理权限，未修改任何规则。",
+                                 reply_markup=keyboard)
             try:
                 result = self._private_word_input(uid, chat_id, operation, text)
             except ValueError as exc:
-                self.send(uid, f"⚠️ {str(exc)[:180]}\n如需重试，请重新点击编辑按钮。")
+                self.send(uid, f"⚠️ {str(exc)[:180]}\n如需重试，请重新点击编辑按钮。",
+                          reply_markup=keyboard)
                 return
-            self.send(uid, result)
+            self.send(uid, result, reply_markup=keyboard)
         else:
             self.send(uid, "请发送 /start 打开中文群管理面板，或 /help 查看命令。")
 
@@ -709,7 +794,8 @@ class GroupBot:
             return self._private_groups(user_id, message.get("message_id"))
         parts = data.split(":")
         if len(parts) not in (2, 3, 4, 5) or parts[0] not in (
-            "g", "t", "v", "n", "w", "s", "sd", "sp", "sx"):
+            "g", "t", "v", "n", "w", "wl", "ws", "wp", "wn",
+            "s", "sd", "sp", "sx"):
             self.answer(qid, "未知或失效的按钮")
             return
         try:
@@ -722,6 +808,58 @@ class GroupBot:
             return
         if parts[0] != "w":
             self._word_wizards.pop(user_id, None)
+        if parts[0] in ("wl", "ws", "wp", "wn"):
+            if len(parts) != 3:
+                return self.answer(qid, "违禁词按钮参数无效", alert=True)
+            operation, setting = parts[0], parts[2]
+            if operation == "wl":
+                try:
+                    page = int(setting)
+                except ValueError:
+                    return self.answer(qid, "页码无效", alert=True)
+                if not 0 <= page <= 100:
+                    return self.answer(qid, "页码超出范围", alert=True)
+                self.answer(qid)
+                return self._private_word_list(
+                    user_id, chat_id, page, message.get("message_id"))
+            conf = self.store.settings(chat_id)
+            if operation == "ws":
+                if setting not in ("on", "off"):
+                    return self.answer(qid, "开关参数无效", alert=True)
+                new_value = setting == "on"
+                if (new_value and not conf["word_filter_enabled"]
+                        and not self.bot_can(chat_id, "can_delete_messages")):
+                    return self.answer(qid, "机器人缺少删除消息权限", alert=True)
+                self.store.set(chat_id, "word_filter_enabled", new_value)
+                label = f"违禁词状态：{'启用' if new_value else '关闭'}"
+            elif operation == "wp":
+                if setting not in ("delete", "mute"):
+                    return self.answer(qid, "处罚选项无效", alert=True)
+                if setting == "mute":
+                    if not self.is_supergroup(chat_id):
+                        return self.answer(qid, "禁言只支持超级群组", alert=True)
+                    if (not self.bot_can(chat_id, "can_delete_messages")
+                            or not self.bot_can(chat_id, "can_restrict_members")):
+                        return self.answer(
+                            qid, "机器人需要删除消息和限制成员权限", alert=True)
+                self.store.set(chat_id, "word_penalty", setting)
+                label = "处罚：仅删除" if setting == "delete" else "处罚：删除并禁言"
+            else:
+                try:
+                    seconds = int(setting)
+                except ValueError:
+                    return self.answer(qid, "提醒时间格式无效", alert=True)
+                if seconds not in (0, 10, 30, 60):
+                    return self.answer(qid, "提醒时间只能选关闭/10/30/60秒", alert=True)
+                if seconds and not self.bot_can(chat_id, "can_delete_messages"):
+                    return self.answer(qid, "机器人缺少删除消息权限", alert=True)
+                self.store.set(chat_id, "word_notice_seconds", seconds)
+                label = "删除提醒：关闭" if not seconds else f"删除提醒：约 {seconds} 秒"
+            self.answer(qid, "✅ " + label)
+            self.log(chat_id, label, actor=user_id)
+            page = "wordpenalty" if operation == "wp" else (
+                "wordnotice" if operation == "wn" else "words")
+            return self._private_view(user_id, chat_id, page, message.get("message_id"))
         if parts[0] == "w":
             if len(parts) != 3 or parts[2] not in WORD_OPERATIONS:
                 return self.answer(qid, "未知违禁词管理操作", alert=True)
@@ -741,7 +879,8 @@ class GroupBot:
             }
             self.send(user_id, f"{prompts[parts[2]]}\n"
                       "有效期5分钟；发送 /cancel 取消。"
-                      "\n所有操作仅影响当前选择的群组。")
+                      "\n所有操作仅影响当前选择的群组。",
+                      reply_markup=self._word_navigation(chat_id))
             return
         if parts[0] == "g" and len(parts) == 2:
             self.answer(qid)
@@ -965,6 +1104,18 @@ class GroupBot:
                                   message_id=pending["message_id"])
                 self.store.del_pending(chat_id, uid)
 
+    def cleanup_word_notices(self):
+        """Delete opt-in short-lived public notices, including after restart."""
+        now = int(time.time())
+        for notice in self.store.pending_notice_deletion_due(now=now):
+            cid, mid = notice["chat_id"], notice["message_id"]
+            # Do not retry a stale or irrevocably undeletable reminder forever.
+            if notice["delete_at"] < now - 3600:
+                self.store.clear_notice_deletion(cid, mid)
+                continue
+            if self.api.safe("deleteMessage", chat_id=cid, message_id=mid) is True:
+                self.store.clear_notice_deletion(cid, mid)
+
     def _moderate(self, message, *, is_edit=False):
         chat = message["chat"]
         chat_id = chat["id"]
@@ -1009,7 +1160,41 @@ class GroupBot:
             if deleted is True:
                 self.store.stat(chat_id, "deleted")
                 self.log(chat_id, f"自动删除（{reason}）", target=user_id)
-                if settings["auto_mute_enabled"] and not is_edit:
+                keyword_muted = False
+                if (reason == "违禁词" and not is_edit
+                        and settings["word_penalty"] == "mute"
+                        and fresh.get("status") in ("member", "restricted")
+                        and self.is_supergroup(chat_id)
+                        and self.bot_can(chat_id, "can_restrict_members")
+                        and self.can_target(chat_id, user_id)):
+                    keyword_muted = self.api.safe(
+                        "restrictChatMember", chat_id=chat_id, user_id=user_id,
+                        permissions=RESTRICTED,
+                        until_date=int(time.time())
+                        + settings["word_mute_minutes"] * 60) is True
+                    if keyword_muted:
+                        self.store.stat(chat_id, "actions")
+                        self.log(chat_id,
+                                 f"违禁词违规，禁言 {settings['word_mute_minutes']} 分钟",
+                                 target=user_id)
+                if reason == "违禁词" and settings["word_notice_seconds"] > 0:
+                    tick = time.monotonic()
+                    if tick - self._last_word_notice.get(chat_id, -1e10) >= 30:
+                        seconds = settings["word_notice_seconds"]
+                        reminder = self.send(
+                            chat_id, f"⛔ 违规消息已清理（本提醒约 {seconds} 秒后撤回）",
+                            disable_notification=True)
+                        if isinstance(reminder, dict) and reminder.get("message_id"):
+                            self._last_word_notice[chat_id] = tick
+                            self.store.schedule_notice_deletion(
+                                chat_id, reminder["message_id"],
+                                int(time.time()) + seconds)
+                        if len(self._last_word_notice) > 5000:
+                            self._last_word_notice = {
+                                cid: last for cid, last in self._last_word_notice.items()
+                                if tick - last < 3600}
+                if (settings["auto_mute_enabled"] and not is_edit
+                        and not keyword_muted):
                     history = self.store.record_moderation(
                         chat_id, user_id, message["message_id"], reason)
                     threshold = settings["auto_mute_after"]
@@ -1073,7 +1258,7 @@ class GroupBot:
         if not chat_id or not uid or source.get("is_bot") or message.get("sender_chat"):
             return
         settings = self.store.settings(chat_id)
-        if settings["ocr_mode"] == "off":
+        if settings["ocr_mode"] == "off" or not settings["word_filter_enabled"]:
             return
         admins = self._get_admins(chat_id)
         if admins is None or uid in admins:
@@ -1102,7 +1287,7 @@ class GroupBot:
             except KeyError:
                 continue
             mode = settings["ocr_mode"]
-            if mode == "off":
+            if mode == "off" or not settings["word_filter_enabled"]:
                 continue
             matched = matched_words(
                 text, confidence,

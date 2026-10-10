@@ -194,8 +194,9 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None,
     """Return one Chinese reason or None. Call only after bot/admin exemption checks."""
     content = message.get("text") or message.get("caption") or ""
     clean = normalize(content)
-    if match_words(clean, banned_words, loose=settings.get("word_loose_match", False),
-                   exceptions=exceptions) is not None:
+    if settings.get("word_filter_enabled", True) and match_words(
+            clean, banned_words, loose=settings.get("word_loose_match", False),
+            exceptions=exceptions) is not None:
         return "违禁词"
     if settings.get("block_forward") and (
         message.get("forward_origin") or message.get("forward_from")

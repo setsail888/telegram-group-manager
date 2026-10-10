@@ -154,6 +154,7 @@ def render_group(db, chat_id, tz):
             + '</div>')
     columns = [
         ("block_links", "链接过滤"), ("anti_flood", "刷屏过滤"),
+        ("word_filter_enabled", "违禁词拦截"),
         ("repeat_photo_enabled", "重复图片检测"),
         ("spam_guard_enabled", "增强反垃圾"),
         ("word_loose_match", "拆字违禁词"),
@@ -167,7 +168,8 @@ def render_group(db, chat_id, tz):
     body += '<h2>功能配置（只读）</h2><div class="grid">'
     for key, label in columns:
         on = (config.get(key, "off") != "off" if key == "ocr_mode"
-              else bool(config.get(key, False)))
+              else bool(config.get(key, True if key == "word_filter_enabled"
+                                   else False)))
         body += ('<div class="card">'
                  + f'<span class="{"on" if on else "off"}">'
                  + f'{"● 开启" if on else "○ 关闭"}</span>'

@@ -51,6 +51,10 @@ def run(api, store, config):
             bot.drain_ocr()
         except Exception:
             LOG.exception("OCR结果处理异常，本轮已跳过")
+        try:
+            bot.cleanup_word_notices()
+        except Exception:
+            LOG.exception("临时删除提醒清理失败")
         if time.monotonic() - last_cleanup >= 30:
             last_cleanup = time.monotonic()
             try:
@@ -70,9 +74,14 @@ def run(api, store, config):
             except Exception:
                 LOG.exception("活跃记录清理失败")
         try:
+            # When a notice is pending, use short polling windows so a
+            # configured 10-second expiration is not delayed by a 25s poll.
+            effective_timeout = (
+                min(config.poll_timeout, 3)
+                if store.has_pending_notice_deletions() else config.poll_timeout)
             updates = api.call(
                 "getUpdates", offset=store.offset() + 1,
-                timeout=config.poll_timeout, limit=50,
+                timeout=effective_timeout, limit=50,
                 allowed_updates=["message", "edited_message", "channel_post",
                                  "callback_query", "my_chat_member"])
             backoff = 1

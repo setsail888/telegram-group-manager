@@ -165,7 +165,7 @@ class GuardPanelTests(unittest.TestCase):
             page = self.edited()
             text = page["text"]
             bodies.append(text)
-            self.assertIn("已添加：300 条", text)
+            self.assertIn("规则：300 条", text)
             self.assertIn("精确例外：1 条", text)
             self.assertLess(len(text), 100)
             self.assertNotIn("测试敏感词_000", text)
@@ -194,7 +194,7 @@ class GuardPanelTests(unittest.TestCase):
         self.bot.handle_update(self.private_msg(1, "推广广告,请加微信,刷单返佣"))
         self.assertEqual(self.store.filter_count(-1001, "word"), 3)
         self.bot.handle_update(self.cb(1, "v:-1001:words"))
-        self.assertIn("已添加：3 条", self.edited()["text"])
+        self.assertIn("规则：3 条", self.edited()["text"])
         self.assertNotIn("推广广告", self.edited()["text"])
 
     def test_all_subpage_callback_data_fit_telegram_64_byte_limit(self):

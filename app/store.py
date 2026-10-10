@@ -25,6 +25,10 @@ DEFAULTS = {
     "repeat_photo_window": 60,
     "spam_guard_enabled": False,
     "word_loose_match": False,
+    "word_filter_enabled": True,
+    "word_penalty": "delete",
+    "word_mute_minutes": 10,
+    "word_notice_seconds": 0,
     "flood_limit": 7,
     "flood_window": 10,
     "repeat_limit": 3,
@@ -44,7 +48,8 @@ DEFAULTS = {
 TOGGLES = {"block_links", "block_forward", "anti_flood", "welcome_enabled",
            "verify_enabled", "block_new_bots", "points_enabled",
            "repeat_photo_enabled", "spam_guard_enabled",
-           "word_loose_match", "auto_mute_enabled", "media_flood_enabled",
+           "word_loose_match", "word_filter_enabled",
+           "auto_mute_enabled", "media_flood_enabled",
            "name_guard_enabled"}
 
 NUMBER_LIMITS = {
@@ -58,6 +63,7 @@ NUMBER_LIMITS = {
     "auto_mute_after": (2, 10),
     "auto_mute_minutes": (1, 1440),
     "name_length_limit": (20, 100),
+    "word_mute_minutes": (5, 1440),
 }
 
 
@@ -107,6 +113,14 @@ class Store:
               ON moderation_events(chat_id,user_id,created_at);
             CREATE INDEX IF NOT EXISTS idx_moderation_events_prune
               ON moderation_events(created_at);
+            CREATE TABLE IF NOT EXISTS pending_notice_deletions (
+              chat_id INTEGER NOT NULL,
+              message_id INTEGER NOT NULL,
+              delete_at INTEGER NOT NULL,
+              PRIMARY KEY(chat_id, message_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_pending_notice_deletions_due
+              ON pending_notice_deletions(delete_at);
             CREATE TABLE IF NOT EXISTS pending (
               chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
               nonce TEXT NOT NULL, answer INTEGER NOT NULL,
@@ -282,6 +296,11 @@ class Store:
         if name == "ocr_confidence" and (
             type(value) is not int or not 40 <= value <= 95):
             raise ValueError("OCR 信心阈值范围为 40–95")
+        if name == "word_penalty" and value not in ("delete", "mute"):
+            raise ValueError("违禁词处罚只能为 delete 或 mute")
+        if name == "word_notice_seconds" and (
+            type(value) is not int or value not in (0, 10, 30, 60)):
+            raise ValueError("违禁词删除提醒只能为 0、10、30、60 秒")
         if name in NUMBER_LIMITS:
             lo, hi = NUMBER_LIMITS[name]
             if type(value) is not int or not lo <= value <= hi:
@@ -321,6 +340,40 @@ class Store:
         return int(self.db.execute(
             "SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
             (int(chat_id), kind)).fetchone()[0])
+
+    def filter_page(self, chat_id, kind, page=0, page_size=8):
+        """User-requested list only; never expand the main panel."""
+        if kind != "word":
+            raise ValueError("只支持查看当前群的违禁词列表")
+        if type(page) is not int or page < 0 or page > 100:
+            raise ValueError("列表页码无效")
+        return [dict(row) for row in self.db.execute(
+            "SELECT key,value FROM filters WHERE chat_id=? AND kind=? "
+            "ORDER BY key LIMIT ? OFFSET ?",
+            (int(chat_id), kind, int(page_size), int(page * page_size)))]
+
+    def schedule_notice_deletion(self, chat_id, message_id, delete_at):
+        """Track only bot's ephemeral warning message IDs; never user content."""
+        self.db.execute(
+            "INSERT OR REPLACE INTO pending_notice_deletions "
+            "(chat_id,message_id,delete_at) VALUES(?,?,?)",
+            (int(chat_id), int(message_id), int(delete_at)))
+
+    def pending_notice_deletion_due(self, now=None, limit=40):
+        now = int(time.time() if now is None else now)
+        return [dict(row) for row in self.db.execute(
+            "SELECT chat_id,message_id,delete_at FROM pending_notice_deletions "
+            "WHERE delete_at<=? ORDER BY delete_at LIMIT ?",
+            (now, min(40, max(1, int(limit)))))]
+
+    def has_pending_notice_deletions(self):
+        return bool(self.db.execute(
+            "SELECT 1 FROM pending_notice_deletions LIMIT 1").fetchone())
+
+    def clear_notice_deletion(self, chat_id, message_id):
+        self.db.execute("DELETE FROM pending_notice_deletions "
+                        "WHERE chat_id=? AND message_id=?",
+                        (int(chat_id), int(message_id)))
 
     def add_filters_bulk(self, chat_id, kind, entries):
         """All-or-nothing import. Same-group, existing rules may be replaced."""
