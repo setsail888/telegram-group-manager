@@ -382,7 +382,8 @@ def handle_command(bot, message):
                 argument, [r["key"] for r in bot.store.filters(chat_id, "word")],
                 loose=settings["word_loose_match"],
                 exceptions=[r["key"] for r in
-                            bot.store.filters(chat_id, "word_exception")])
+                            bot.store.filters(chat_id, "word_exception")],
+                modes=bot.store.word_modes(chat_id))
             bot.send(chat_id, "🧪 违禁词测试（不处罚）："
                      + (f"命中 {str(found)[:75]}" if found else "未命中关键词"))
         elif command in ("wordexcept", "delwordexcept"):

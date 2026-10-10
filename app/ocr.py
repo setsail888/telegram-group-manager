@@ -16,7 +16,7 @@ from queue import Empty, Queue
 from threading import BoundedSemaphore
 
 from .api import TelegramAPIError
-from .moderation import normalize
+from .moderation import normalize, match_words
 
 LOG = logging.getLogger("groupguard.ocr")
 MAX_OCR_FILE_BYTES = 3_000_000
@@ -57,7 +57,7 @@ def extract_tesseract(data):
     return (" ".join(tokens)[:4000], sum(scores) / len(scores))
 
 
-def matched_words(text, confidence, keywords, threshold=65, *, exceptions=()):
+def matched_words(text, confidence, keywords, threshold=65, *, exceptions=(), modes=None):
     """Return normalized phrases only for high-confidence >=4-character matches."""
     if not text or not math.isfinite(confidence) or confidence < threshold:
         return []
@@ -68,9 +68,17 @@ def matched_words(text, confidence, keywords, threshold=65, *, exceptions=()):
         if separator and normalized_text == re.sub(r"[\s\W_]+", "", context, flags=re.UNICODE):
             exempt.add(re.sub(r"[\s\W_]+", "", phrase, flags=re.UNICODE))
     hits = []
+    modes = {normalize(k): v for k, v in (modes or {}).items()}
     for phrase in keywords:
         candidate = re.sub(r"[\s\W_]+", "", normalize(phrase), flags=re.UNICODE)
-        if 4 <= len(candidate) <= 80 and candidate in normalized_text and candidate not in exempt:
+        mode = modes.get(normalize(phrase), "contains")
+        if mode == "exact":
+            hit = normalized_text == candidate
+        elif mode == "word":
+            hit = match_words(text, [phrase], modes={phrase: "word"}) is not None
+        else:
+            hit = candidate in normalized_text
+        if 4 <= len(candidate) <= 80 and hit and candidate not in exempt:
             hits.append(candidate)
     return list(dict.fromkeys(hits))[:4]
 

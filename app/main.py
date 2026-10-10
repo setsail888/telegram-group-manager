@@ -29,6 +29,7 @@ def run(api, store, config):
     api.safe("setMyCommands", commands=[
         {"command": "start", "description": "打开中文群组管理面板"},
         {"command": "panel", "description": "群组管理面板"},
+        {"command": "menu", "description": "成员按钮菜单：签到、积分、兑换、抽奖、群规"},
         {"command": "help", "description": "查看指令"},
         {"command": "rules", "description": "查看群规"},
         {"command": "stats", "description": "今日群组数据"},

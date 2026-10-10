@@ -7,12 +7,13 @@ import secrets
 import time
 from datetime import datetime
 
-from .moderation import normalize_domain, evaluate
+from .moderation import normalize_domain, evaluate, WORD_MODES
 from .reply_rules import parse_keywords, parse_buttons, media_from_reply
 from .scheduler import parse_rule, next_occurrence, format_run
 
 
 FORMS = {
+    "word_search": ("words", (("query", "发送搜索文字（1–80字），按文字查找词库。"),)),
     "domain_add": ("domains", (("domains", "发送域名，每行一个（最多80个）。例如 example.com；其子域名也会放行。"),)),
     "reply_add": ("replies", (("keywords", "发送触发关键词，多个词用逗号隔开。"),
                                ("body", "发送回复正文，或发送带说明的图片/视频/动图/文件。"),
@@ -41,9 +42,71 @@ class AdminUI:
     def __init__(self, bot):
         self.bot = bot
         self.drafts = {}
+        self.word_choices = {}
+        self.searches = {}
 
     def cancel(self, uid):
         self.drafts.pop(uid, None)
+
+    def _token(self, mapping, uid, cid, **values):
+        now = time.monotonic()
+        for key in list(mapping):
+            if mapping[key]["expires"] <= now:
+                del mapping[key]
+        while len(mapping) >= 2000:
+            del mapping[next(iter(mapping))]
+        token = secrets.token_hex(6)
+        mapping[token] = {"uid": uid, "cid": cid, "expires": now+600, **values}
+        return token
+
+    def _choice(self, mapping, uid, cid, token):
+        choice = mapping.get(token)
+        if (not choice or choice["uid"] != uid or choice["cid"] != cid
+                or choice["expires"] <= time.monotonic()):
+            raise ValueError("列表已过期，请重新打开。")
+        return choice
+
+    def word_buttons(self, uid, cid, rows):
+        modes = self.bot.store.word_modes(cid)
+        return [[self.bot._button(f"✏️ {row['value'][:35]} · {WORD_MODES[modes.get(row['key'], 'contains')]}",
+                    f"ad:{cid}:word:{self._token(self.word_choices, uid, cid, key=row['key'])}")]
+                for row in rows]
+
+    def word_choice(self, uid, cid, token):
+        choice = self._choice(self.word_choices, uid, cid, token)
+        rule = self.bot.store.word_rule(cid, choice["key"])
+        if not rule:
+            raise ValueError("关键词已删除，请刷新列表。")
+        return rule
+
+    def word_detail(self, uid, cid, token, mid):
+        rule, b = self.word_choice(uid, cid, token), self.bot._button
+        text = (f"📝 关键词：{rule['value']}\n当前匹配：{WORD_MODES[rule['mode']]}\n\n"
+                "包含：文字中出现即命中，遵循拆字匹配开关。\n"
+                "整词：两侧不能紧邻字母、数字、下划线或汉字，适合英文短词；不进行中文分词。\n"
+                "整句：整条文字与关键词相同才命中。\n"
+                "均忽略大小写、全半角和零宽字符；整词、整句不使用拆字匹配。\n"
+                "图片识别仍需满足OCR的置信度与至少4字限制。")
+        kb = [[b(label, f"ad:{cid}:wm_{mode}:{token}") for mode, label in WORD_MODES.items()],
+              [b("🗑 删除该关键词", f"ad:{cid}:word_delete:{token}")],
+              [b("⬅️ 返回词库列表", f"wl:{cid}:0")]]
+        return self.bot._edit_or_send(uid, mid, text, kb)
+
+    def search_page(self, uid, cid, token, page, mid=None):
+        choice = self._choice(self.searches, uid, cid, token)
+        rows, count, page, pages = self.bot.store.search_words(cid, choice["query"], page)
+        kb = self.word_buttons(uid, cid, rows)
+        nav = []
+        for label, index in (("◀️ 上一页", page-1), ("下一页 ▶️", page+1)):
+            if 0 <= index < pages:
+                nav.append(self.bot._button(label, f"ad:{cid}:searchpage:{token}_{index}"))
+        if nav:
+            kb.append(nav)
+        kb.append([self.bot._button("🔎 重新搜索", f"ad:{cid}:begin:word_search")])
+        kb += self.back(cid, "words")
+        text = (f"🔎 搜索：{choice['query']}\n共 {count} 条 · 第 {page+1}/{pages} 页\n"
+                "点击条目设置匹配方式或删除。" + ("\n没有符合的关键词。" if not rows else ""))
+        return self.bot._edit_or_send(uid, mid, text, kb)
 
     def _draft(self, uid, cid, op, page, values=None):
         now = time.monotonic()
@@ -118,10 +181,15 @@ class AdminUI:
                 reason = evaluate({"text": text}, conf,
                     [r["key"] for r in self.bot.store.filters(cid, "word")],
                     [r["key"] for r in self.bot.store.filters(cid, "domain")],
-                    exceptions=[r["key"] for r in self.bot.store.filters(cid, "word_exception")])
+                    exceptions=[r["key"] for r in self.bot.store.filters(cid, "word_exception")],
+                    modes=self.bot.store.word_modes(cid))
                 self.cancel(uid)
                 self.bot.send(uid, "🧪 文字规则测试：" + (reason or "未命中") + "\n不包含图片、隐藏实体、频率或成员身份检查。",
                               reply_markup={"inline_keyboard": self.back(cid, "spam")})
+            elif op == "word_search":
+                token = self._token(self.searches, uid, cid, query=value)
+                self.cancel(uid)
+                self.search_page(uid, cid, token, 0)
             else:
                 if op == "reply_add":
                     values["previous"] = next((r for r in self.bot.store.replies(cid)
@@ -191,7 +259,9 @@ class AdminUI:
                 values["media_type"], values["media_id"] = kind, file_id
                 return text
         lo, hi = (1, 1500)
-        if op == "reply_add":
+        if op == "word_search":
+            lo, hi = 1, 80
+        elif op == "reply_add":
             lo, hi = 1, 1500
         elif key == "title":
             lo, hi = (2, 100) if op == "raffle_add" else (1, 60) if op.startswith("schedule_") else (2, 60)
@@ -233,6 +303,37 @@ class AdminUI:
         elif page == "verify":
             conf = self.bot.store.settings(cid)
             text += f"\n最多答错 {conf['verify_attempt_limit']} 次；用完后保持限制，超时移出后可重新加入。"
+        elif page == "words":
+            text += "\n词库列表支持逐词选择包含、整词或整句匹配。"
+            keyboard.append([add("🔎 搜索词库", "word_search")])
+        elif page == "raid":
+            conf = self.bot.store.settings(cid)
+            until = self.bot.store.raid_until(cid)
+            state = ("保护中，至 " + datetime.fromtimestamp(until, self.bot.store.tz).strftime("%m-%d %H:%M:%S")
+                     if until else "当前未处于保护期")
+            text = (f"🚨 集中入群保护\n{state}\n自动检测：{'开' if conf['raid_enabled'] else '关'}\n"
+                    f"{conf['raid_window']} 秒内 {conf['raid_join_limit']} 个不同普通成员入群，"
+                    f"触发 {conf['raid_duration']} 分钟保护。\n"
+                    "从触发者起，新人需完成验证；不追溯之前的成员。管理员和机器人不计入人数。\n"
+                    "到期自动停止对后续新人的额外验证；已经收到验证题的成员仍需答题。\n"
+                    "保护期限重启后保留，入群计数重启后重新累计。\n"
+                    "关闭自动检测不会提前停止已有保护，请使用下方停止按钮。")
+            keyboard.append([b("🛡️ 立即开始保护", f"ad:{cid}:raid:start"),
+                             b("⏹ 停止额外保护", f"ad:{cid}:raid:stop")])
+        elif page == "permissions":
+            member = self.bot.api.safe("getChatMember", chat_id=cid, user_id=self.bot.bot_id)
+            chat = self.bot.api.safe("getChat", chat_id=cid)
+            member = member if isinstance(member, dict) else {}
+            chat = chat if isinstance(chat, dict) else {}
+            is_owner = member.get("status") == "creator"
+            right = lambda key: "✅" if is_owner or member.get(key) is True else "❌ / 未能确认"
+            text = (f"🔐 机器人权限检查\n群类型：{chat.get('type', '未能获取')}\n"
+                    f"管理身份：{member.get('status', '未能获取')}\n"
+                    f"删除消息：{right('can_delete_messages')}\n限制成员：{right('can_restrict_members')}\n"
+                    f"OCR引擎：{'可用' if self.bot.ocr.available else '未启用'}\n\n"
+                    "内容清理需要删除消息权限；禁言、新人验证和集中入群保护需要限制成员权限及超级群组。\n"
+                    "如缺少权限，请在 Telegram 群设置中授予后刷新。")
+            keyboard.append([b("🔄 重新检查", f"v:{cid}:permissions")])
         elif page == "manage":
             text = "👮 成员管理\n选择操作 → 输入数字ID → 预览确认。\n每次重新核验管理权限和目标身份；管理员与本机器人受保护。\n警告达到上限后临时禁言60分钟。"
             ops = [("⚠️ 警告", "warn"), ("清除警告", "unwarn"), ("🔇 禁言", "mute"),
@@ -347,6 +448,15 @@ class AdminUI:
                 draft = self._draft(uid, cid, arg, FORMS[arg][0])
                 bot.answer(qid)
                 return self._prompt(uid, draft)
+            if action == "word":
+                self.word_choice(uid, cid, arg)
+                bot.answer(qid)
+                return self.word_detail(uid, cid, arg, mid)
+            if action == "searchpage":
+                token, _, page_index = arg.partition("_")
+                self._choice(self.searches, uid, cid, token)
+                bot.answer(qid)
+                return self.search_page(uid, cid, token, int(page_index), mid)
             if action in ("domains", "replies", "shop", "orders", "schedules", "raffle", "audit"):
                 text, kb = self.list_page(cid, action, max(0,int(arg)))
                 # Controls remain visible while paginating auto-replies.
@@ -362,7 +472,23 @@ class AdminUI:
                 text, kb = self.list_page(cid, "audit", 0)
                 return bot._edit_or_send(uid, mid, text, kb+[[bot._button("⬅️ 返回设置", f"g:{cid}")]])
             page, values, summary = "spam", {}, ""
-            if action == "ocr":
+            if action.startswith("wm_") or action == "word_delete":
+                rule = self.word_choice(uid, cid, arg)
+                mode = action[3:] if action.startswith("wm_") else None
+                if mode is not None and mode not in WORD_MODES:
+                    raise ValueError("未知关键词匹配方式。")
+                page, values = "words", {"expected": rule, "mode": mode}
+                summary = f"关键词：{rule['value']}\n" + ("删除该关键词。" if mode is None else
+                    f"匹配方式：{WORD_MODES[rule['mode']]} → {WORD_MODES[mode]}")
+                action = "word_delete" if mode is None else "word_mode"
+            elif action == "raid":
+                if arg not in ("start", "stop"):
+                    raise ValueError("未知入群防护操作。")
+                duration = bot.store.settings(cid)["raid_duration"]
+                page, values = "raid", {"previous": bot.store.raid_until(cid), "action": arg, "duration": duration}
+                summary = (f"立即开始 {duration} 分钟额外新人验证。" if arg == "start" else
+                           "停止额外新人验证；已有验证题仍有效，常规新人验证开关不受影响。")
+            elif action == "ocr":
                 if arg not in ("off", "review", "delete"):
                     raise ValueError("无效OCR模式。")
                 page, values = "ocr", {"mode": arg}
@@ -404,6 +530,17 @@ class AdminUI:
     def commit(self, uid, draft):
         bot, store, cid = self.bot, self.bot.store, draft["cid"]
         op, v = draft["op"], draft["values"]
+        if op in ("word_mode", "word_delete"):
+            store.edit_word_rule(cid, v["expected"]["key"], v["mode"], expected=v["expected"])
+            return "关键词已删除。" if v["mode"] is None else "关键词匹配方式已更新。"
+        if op == "raid":
+            if store.raid_until(cid) != v["previous"]:
+                raise ValueError("保护状态已变化，请重新操作。")
+            if v["action"] == "start" and (not bot.is_supergroup(cid) or not bot.bot_can(cid, "can_restrict_members")):
+                raise ValueError("需要超级群组和机器人限制成员权限。")
+            store.set_raid_until(cid, int(time.time()) + v["duration"] * 60 if v["action"] == "start" else 0)
+            bot.join_guard.clear(cid)
+            return "保护已开始。" if v["action"] == "start" else "额外保护已停止；已有验证题仍有效。"
         if op == "domain_add":
             count = store.add_filters_bulk(cid, "domain", [(s,s) for s in v["domains"]])
             return f"已添加 {count} 条域名白名单。"

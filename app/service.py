@@ -17,6 +17,7 @@ from .scheduler import format_run, next_occurrence
 from .store import TOGGLES, NUMBER_LIMITS
 from .admin_ui import AdminUI
 from .member_ui import MemberUI
+from .raid import JoinGuard
 
 LOG = logging.getLogger(__name__)
 GROUP_TYPES = {"group", "supergroup"}
@@ -44,6 +45,7 @@ MENU_MODULES = (
     ("📈 最近7天", "stats7"), ("🏆 活跃排行", "activity"),
     ("⚙️ 规则总览", "overview"), ("📖 命令指南", "help"),
     ("🔍 防护记录", "audit"), ("👮 成员管理", "manage"),
+    ("🚨 集中入群防护", "raid"), ("🔐 权限检查", "permissions"),
     ("🧾 管理日志", "logs"), ("🔄 切换群组", "groups"),
 )
 PAGE_SWITCHES = {
@@ -68,6 +70,7 @@ PAGE_SWITCHES = {
     "members": (("👤 超长昵称限制", "name_guard_enabled"),),
     "photo": (("🖼️ 重复图片拦截", "repeat_photo_enabled"),),
     "points": (("🪙 签到积分", "points_enabled"),),
+    "raid": (("🚨 自动检测集中入群", "raid_enabled"),),
 }
 PAGE_NUMBERS = {
     "spam": (("mention_limit", "批量提及次数", 1),
@@ -96,6 +99,10 @@ PAGE_NUMBERS = {
     "ocr": (("ocr_confidence", "最低可信度", 5),),
     "replies": (("reply_group_limit", "全群每分钟回复上限", 1),),
     "manage": (("warn_limit", "警告上限", 1),),
+    "raid": (("raid_join_limit", "触发入群人数", 1),
+             ("raid_window", "检测窗口（秒）", 10),
+             ("raid_duration", "保护时长（分钟）", 1)),
+    "welcome": (("welcome_limit", "每分钟欢迎上限", 1),),
 }
 WORD_OPERATIONS = {"add", "del", "except", "unexcept", "test"}
 FLOOD_REASONS = frozenset(("短时刷屏", "重复刷屏", "媒体刷屏"))
@@ -114,6 +121,7 @@ class GroupBot:
         self.owner_ids = owner_ids
         self.flood = FloodGuard()
         self.photo_guard = PhotoRepeatGuard()
+        self.join_guard = JoinGuard()
         self.economy = Economy(store)
         self.raffles = Raffles(store)
         self.ocr = OCRWorker(
@@ -185,8 +193,8 @@ class GroupBot:
             member = self.api.call("getChatMember", chat_id=chat_id, user_id=self.bot_id)
         except TelegramAPIError:
             return False
-        return member.get("status") == "creator" or (
-            member.get("status") == "administrator" and member.get(permission, False))
+        return isinstance(member, dict) and (member.get("status") == "creator" or (
+            member.get("status") == "administrator" and member.get(permission, False)))
 
     def is_supergroup(self, chat_id):
         try:
@@ -202,7 +210,7 @@ class GroupBot:
             status = self.api.call("getChatMember", chat_id=chat_id, user_id=int(user_id))
         except TelegramAPIError:
             return False
-        return not admin_status(status)
+        return isinstance(status, dict) and status.get("status") in ("member", "restricted", "left", "kicked")
 
     def unrestrict(self, chat_id, user_id):
         # Telegram still applies the group's default permissions. Preserve
@@ -311,7 +319,7 @@ class GroupBot:
         listing = "\n".join(
             f"{page * 8 + i}. {str(row['value'])[:80]}"
             for i, row in enumerate(rows, 1)) or "暂无违禁词"
-        keyboard = []
+        keyboard = self.admin_ui.word_buttons(user_id, chat_id, rows)
         navigation = []
         if page > 0:
             navigation.append(self._button("◀️ 上一页", f"wl:{chat_id}:{page-1}"))
@@ -744,6 +752,7 @@ class GroupBot:
         return (
             "🤖 中文群管命令（在群内使用）\n"
             "/panel 私聊管理面板 /settings 查看开关\n"
+            "/menu 成员按钮菜单（签到、积分、兑换、抽奖、群规）\n"
             "/links on|off /forward on|off /flood on|off\n"
             "/captcha on|off /welcome on|off\n"
             "/addword 词 /delword 词 /words\n"
@@ -818,7 +827,8 @@ class GroupBot:
                 text, [row["key"] for row in self.store.filters(chat_id, "word")],
                 loose=self.store.settings(chat_id)["word_loose_match"],
                 exceptions=[row["key"] for row in
-                            self.store.filters(chat_id, "word_exception")])
+                            self.store.filters(chat_id, "word_exception")],
+                modes=self.store.word_modes(chat_id))
             return ("🧪 测试结果：" + (
                 f"命中 {str(found)[:70]}" if found else "没有命中违禁词") +
                 "\n此操作不会处罚任何成员。")
@@ -1157,10 +1167,10 @@ class GroupBot:
             return self.answer(qid, "非法功能页开关", alert=True)
         needed = ("can_restrict_members" if action in (
             "verify_enabled", "block_new_bots", "auto_mute_enabled",
-            "name_guard_enabled")
+            "name_guard_enabled", "raid_enabled")
                   else "can_delete_messages")
         if action not in ("verify_enabled", "block_new_bots", "auto_mute_enabled",
-                          "name_guard_enabled",
+                          "name_guard_enabled", "raid_enabled",
                           "block_links", "block_forward", "anti_flood",
                           "repeat_photo_enabled", "spam_guard_enabled",
                           "word_loose_match", "media_flood_enabled",
@@ -1171,7 +1181,7 @@ class GroupBot:
             self.answer(qid, "机器人缺少必要管理员权限，请先授予权限。", alert=True)
             return
         if (action in ("verify_enabled", "block_new_bots", "auto_mute_enabled",
-                       "name_guard_enabled") and not current
+                       "name_guard_enabled", "raid_enabled") and not current
                 and not self.is_supergroup(chat_id)):
             self.answer(qid, "该功能仅支持超级群组。", alert=True)
             return
@@ -1232,6 +1242,7 @@ class GroupBot:
             if uid is None or uid == self.bot_id or member.get("is_bot"):
                 if (uid and uid != self.bot_id and member.get("is_bot")
                     and settings["block_new_bots"]
+                    and self.can_target(chat_id, uid)
                     and self.bot_can(chat_id, "can_restrict_members")):
                     removed = self.api.safe("banChatMember", chat_id=chat_id,
                                             user_id=uid)
@@ -1241,20 +1252,37 @@ class GroupBot:
                         self.log(chat_id, "拦截新加入的第三方机器人", target=uid)
                 continue
             self.store.stat(chat_id, "joins")
-            if (settings["name_guard_enabled"] and not settings["verify_enabled"]
+            if self.store.pending(chat_id, uid):
+                continue
+            active = bool(self.store.raid_until(chat_id))
+            if (active or settings["raid_enabled"] or settings["verify_enabled"]
+                    or settings["name_guard_enabled"]):
+                try:
+                    status = self.api.call("getChatMember", chat_id=chat_id, user_id=uid)
+                except TelegramAPIError:
+                    continue
+                if (not isinstance(status, dict) or admin_status(status)
+                        or status.get("status") != "member"):
+                    # Never replace somebody else's restriction with a challenge
+                    # that would grant permissions back after solving it.
+                    continue
+            if (settings["raid_enabled"] and not active
+                    and self.join_guard.arrival(chat_id, uid,
+                        limit=settings["raid_join_limit"], window=settings["raid_window"])
+                    and self.is_supergroup(chat_id)
+                    and self.bot_can(chat_id, "can_restrict_members")):
+                self.store.set_raid_until(chat_id, int(time.time()) + settings["raid_duration"] * 60)
+                self.join_guard.clear(chat_id)
+                self.store.stat(chat_id, "raid_triggers")
+                self.log(chat_id, "集中入群保护触发，新加入成员需完成验证")
+                active = True
+            needs_verify = settings["verify_enabled"] or active
+            if (settings["name_guard_enabled"] and not needs_verify
                     and self.is_supergroup(chat_id)):
                 nickname = (str(member.get("first_name") or "") + " "
                             + str(member.get("last_name") or "")).strip()
                 if len(nickname) > settings["name_length_limit"]:
-                    # Unknown user status fails open; never restrict an admin
-                    # promoted during a join, even if our cached list is stale.
-                    try:
-                        status = self.api.call(
-                            "getChatMember", chat_id=chat_id, user_id=uid)
-                    except TelegramAPIError:
-                        status = None
-                    if (status is not None and not admin_status(status)
-                            and self.bot_can(chat_id, "can_restrict_members")):
+                    if self.bot_can(chat_id, "can_restrict_members"):
                         restricted = self.api.safe(
                             "restrictChatMember", chat_id=chat_id, user_id=uid,
                             permissions=RESTRICTED,
@@ -1264,14 +1292,27 @@ class GroupBot:
                             self.log(chat_id, "新成员昵称过长，限制发言30分钟",
                                      target=uid)
                             continue
-            if settings["verify_enabled"]:
-                self._start_verification(chat_id, member, settings)
-            elif settings["welcome_enabled"]:
+            if needs_verify:
+                self._start_verification(chat_id, member, settings, verified_member=True)
+            elif (settings["welcome_enabled"] and self.join_guard.welcome(
+                    chat_id, limit=settings["welcome_limit"])):
                 name = str(member.get("first_name", "新朋友"))[:64]
                 self.send(chat_id, settings["welcome_text"].replace("{name}", name))
 
-    def _start_verification(self, chat_id, member, settings):
+    def _start_verification(self, chat_id, member, settings, *, verified_member=False):
         uid = member["id"]
+        # Replayed join updates must not replace the challenge or reset attempts.
+        if self.store.pending(chat_id, uid):
+            return
+        if not verified_member:
+            try:
+                status = self.api.call("getChatMember", chat_id=chat_id, user_id=uid)
+            except TelegramAPIError:
+                return
+            if uid == self.bot_id or not isinstance(status, dict) or status.get("status") != "member":
+                return
+        if not self.is_supergroup(chat_id):
+            return
         now = int(time.time())
         timeout = settings["verify_timeout"]
         if not self.bot_can(chat_id, "can_restrict_members"):
@@ -1415,6 +1456,7 @@ class GroupBot:
                           self.flood,
                           exceptions=[r["key"] for r in
                                       self.store.filters(chat_id, "word_exception")],
+                          modes=self.store.word_modes(chat_id),
                           is_edit=is_edit)
         if not reason and not is_edit and settings["repeat_photo_enabled"]:
             reason = self.photo_guard.check(
@@ -1583,7 +1625,8 @@ class GroupBot:
                 text, confidence,
                 [r["key"] for r in self.store.filters(cid, "word")],
                 threshold=settings["ocr_confidence"],
-                exceptions=[r["key"] for r in self.store.filters(cid, "word_exception")])
+                exceptions=[r["key"] for r in self.store.filters(cid, "word_exception")],
+                modes=self.store.word_modes(cid))
             if not matched:
                 continue
             try:

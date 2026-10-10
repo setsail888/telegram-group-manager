@@ -5,6 +5,7 @@ import sqlite3
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from .moderation import WORD_MODES, normalize
 
 DEFAULTS = {
     "block_links": True,
@@ -52,6 +53,11 @@ DEFAULTS = {
     "album_single_enabled": False,
     "reply_group_limit": 20,
     "verify_attempt_limit": 3,
+    "raid_enabled": False,
+    "raid_join_limit": 10,
+    "raid_window": 60,
+    "raid_duration": 10,
+    "welcome_limit": 10,
 }
 TOGGLES = {"block_links", "block_forward", "anti_flood", "welcome_enabled",
            "verify_enabled", "block_new_bots", "points_enabled",
@@ -59,7 +65,7 @@ TOGGLES = {"block_links", "block_forward", "anti_flood", "welcome_enabled",
            "word_loose_match", "word_filter_enabled",
            "auto_mute_enabled", "media_flood_enabled",
            "name_guard_enabled", "observe_only", "block_external_channels",
-           "album_single_enabled"}
+           "album_single_enabled", "raid_enabled"}
 
 NUMBER_LIMITS = {
     "flood_limit": (3, 30),
@@ -82,6 +88,10 @@ NUMBER_LIMITS = {
     "checkin_award": (1, 100),
     "reply_group_limit": (1, 60),
     "warn_limit": (1, 10),
+    "raid_join_limit": (3, 100),
+    "raid_window": (10, 300),
+    "raid_duration": (1, 60),
+    "welcome_limit": (1, 60),
 }
 
 
@@ -255,6 +265,15 @@ class Store:
             );
         """)
         self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS word_modes (
+              chat_id INTEGER NOT NULL, kind TEXT NOT NULL DEFAULT 'word' CHECK(kind='word'),
+              key TEXT NOT NULL, mode TEXT NOT NULL CHECK(mode IN ('contains','word','exact')),
+              PRIMARY KEY(chat_id,kind,key),
+              FOREIGN KEY(chat_id,kind,key) REFERENCES filters(chat_id,kind,key) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS raid_state (
+              chat_id INTEGER PRIMARY KEY, until_at INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS moderation_audit (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL,
@@ -365,7 +384,8 @@ class Store:
             (int(chat_id), kind, str(key))).fetchone()
         if count >= 300 and not exists:
             raise ValueError("每类规则最多 300 条")
-        self.db.execute("INSERT OR REPLACE INTO filters VALUES (?,?,?,?)",
+        self.db.execute("INSERT INTO filters VALUES (?,?,?,?) "
+                        "ON CONFLICT(chat_id,kind,key) DO UPDATE SET value=excluded.value",
                         (int(chat_id), kind, str(key), str(value)))
 
     def del_filter(self, chat_id, kind, key):
@@ -435,13 +455,72 @@ class Store:
             if len(existing | set(unique)) > 300:
                 raise ValueError("超过每群每类 300 条上限，本次没有导入任何规则")
             for key, value in unique.items():
-                self.db.execute("INSERT OR REPLACE INTO filters VALUES (?,?,?,?)",
+                self.db.execute("INSERT INTO filters VALUES (?,?,?,?) "
+                                "ON CONFLICT(chat_id,kind,key) DO UPDATE SET value=excluded.value",
                                 (int(chat_id), kind, key, value))
             self.db.execute("COMMIT")
         except Exception:
             self.db.execute("ROLLBACK")
             raise
         return len(unique)
+
+    def word_modes(self, chat_id):
+        return {r["key"]: r["mode"] for r in self.db.execute(
+            "SELECT key,mode FROM word_modes WHERE chat_id=?", (int(chat_id),))}
+
+    def word_rule(self, chat_id, key):
+        row = self.db.execute(
+            "SELECT f.key,f.value,COALESCE(m.mode,'contains') AS mode FROM filters f "
+            "LEFT JOIN word_modes m USING(chat_id,kind,key) WHERE f.chat_id=? AND f.kind='word' AND f.key=?",
+            (int(chat_id), str(key))).fetchone()
+        return dict(row) if row else None
+
+    def edit_word_rule(self, chat_id, key, mode, *, expected=None):
+        """Set a mode (None deletes). Check preview state under the write lock."""
+        if mode is not None and mode not in WORD_MODES:
+            raise ValueError("未知关键词匹配方式")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.word_rule(chat_id, key)
+            if not row or expected is not None and row != expected:
+                raise ValueError("关键词已被修改或删除，请重新查看。")
+            if mode is None:
+                self.del_filter(chat_id, "word", key)
+            else:
+                self.db.execute("INSERT INTO word_modes(chat_id,key,mode) VALUES(?,?,?) "
+                                "ON CONFLICT(chat_id,kind,key) DO UPDATE SET mode=excluded.mode",
+                                (int(chat_id), str(key), mode))
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def search_words(self, chat_id, query, page=0):
+        query = normalize(query)
+        if not 1 <= len(query) <= 80:
+            raise ValueError("搜索词需为1–80字")
+        # Search literal characters; %, _ and backslash are not wildcards.
+        literal = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        where = "chat_id=? AND kind='word' AND (key LIKE ? ESCAPE '\\' OR value LIKE ? ESCAPE '\\')"
+        params = (int(chat_id), "%"+literal+"%", "%"+literal+"%")
+        count = self.db.execute("SELECT COUNT(*) FROM filters WHERE "+where, params).fetchone()[0]
+        pages = max(1, (count+7)//8)
+        page = max(0, min(int(page), pages-1))
+        rows = self.db.execute("SELECT key,value FROM filters WHERE "+where+" ORDER BY key LIMIT 8 OFFSET ?",
+                               (*params, page*8))
+        return [dict(r) for r in rows], count, page, pages
+
+    def raid_until(self, chat_id, now=None):
+        when = int(time.time() if now is None else now)
+        row = self.db.execute("SELECT until_at FROM raid_state WHERE chat_id=? AND until_at>?",
+                              (int(chat_id), when)).fetchone()
+        return row[0] if row else 0
+
+    def set_raid_until(self, chat_id, until_at):
+        if not self.chat(chat_id):
+            raise ValueError("未知群组")
+        self.db.execute("INSERT INTO raid_state VALUES(?,?) ON CONFLICT(chat_id) "
+                        "DO UPDATE SET until_at=excluded.until_at", (int(chat_id), int(until_at)))
 
     def record_moderation(self, chat_id, user_id, message_id, reason, now=None,
                           window=600):

@@ -19,6 +19,7 @@ _MENTION = re.compile(r"(?<![\w@])@[a-zA-Z][a-zA-Z0-9_]{4,31}\b")
 _OBFUSCATED_DOT = re.compile(
     r"\s*(?:\[\s*(?:\.|dot)\s*\]|\(\s*(?:\.|dot)\s*\))\s*"
     r"|(?<=\w)\s+\.\s*|\.\s+(?=\w)", re.IGNORECASE)
+WORD_MODES = {"contains": "包含", "word": "整词", "exact": "整句"}
 
 
 def normalize(value):
@@ -35,15 +36,20 @@ def compact(value):
 
 
 @lru_cache(maxsize=128)
-def _word_rules(words, exceptions):
+def _word_rules(words, exceptions, modes=()):
     """Reuse normalized rules; immutable keys make edits take effect immediately."""
     rules = []
+    modes = dict(modes)
     for word in words:
         phrase = normalize(word)
         dense = compact(phrase)
         minimum = 3 if any("\u3400" <= c <= "\u9fff" for c in dense) else 4
         if phrase:
-            rules.append((word, phrase, dense, len(dense) >= minimum))
+            mode = modes.get(phrase, "contains")
+            if mode not in WORD_MODES:
+                raise ValueError("未知关键词匹配方式")
+            boundary = re.compile(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)") if mode == "word" else None
+            rules.append((word, phrase, dense, len(dense) >= minimum, mode, boundary))
     waived = set()
     for rule in exceptions:
         prefix, sep, context = rule.partition("|")
@@ -52,17 +58,22 @@ def _word_rules(words, exceptions):
     return tuple(rules), frozenset(waived)
 
 
-def match_words(text, banned_words, *, loose=False, exceptions=()):
+def match_words(text, banned_words, *, loose=False, exceptions=(), modes=None):
     """Return the matching banned word; exceptions only waive their own rule."""
     clean = normalize(text)
     dense = compact(clean) if loose else ""
     rules, waived = _word_rules(tuple(str(w) for w in banned_words),
-                                tuple(str(e) for e in exceptions))
-    for word, phrase, dense_keyword, allowed_loose in rules:
-        basic = phrase in clean
+                                tuple(str(e) for e in exceptions),
+                                tuple(sorted((normalize(k), v) for k, v in (modes or {}).items())))
+    for word, phrase, dense_keyword, allowed_loose, mode, boundary in rules:
         # Loose mode is opt-in and requires enough characters to reduce
         # false positives on short, common Chinese/English substrings.
-        found = basic or (loose and allowed_loose and dense_keyword in dense)
+        if mode == "exact":
+            found = phrase == clean
+        elif mode == "word":
+            found = boundary.search(clean) is not None
+        else:
+            found = phrase in clean or (loose and allowed_loose and dense_keyword in dense)
         if not found:
             continue
         # Waive only this rule and this exact normalized message.
@@ -260,16 +271,30 @@ class PhotoRepeatGuard:
 
 
 def evaluate(message, settings, banned_words, allowed_domains, flood=None,
-             *, exceptions=(), is_edit=False):
+             *, exceptions=(), is_edit=False, modes=None):
     """Return one Chinese reason or None. Call only after bot/admin exemption checks."""
     content = message.get("text") or message.get("caption") or ""
     buttons = [button for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
                for button in row if isinstance(button, dict)]
     clean = normalize("\n".join([content] + [str(b.get("text") or "") for b in buttons]))
-    if settings.get("word_filter_enabled", True) and match_words(
-            clean, banned_words, loose=settings.get("word_loose_match", False),
-            exceptions=exceptions) is not None:
-        return "违禁词"
+    if settings.get("word_filter_enabled", True):
+        if match_words(clean, banned_words, loose=settings.get("word_loose_match", False),
+                       exceptions=exceptions, modes=modes) is not None:
+            return "违禁词"
+        # A harmless button must not let an exact body/caption evade its rule.
+        # Button labels are individual pieces of visible text as well.
+        if buttons:
+            normalized_modes = {normalize(k): v for k, v in (modes or {}).items()}
+            waived = set()
+            for exception in exceptions:
+                phrase, separator, context = str(exception).partition("|")
+                if separator and normalize(context) == clean:
+                    waived.add(normalize(phrase))
+            exact = [w for w in banned_words if normalized_modes.get(normalize(w)) == "exact"
+                     and normalize(w) not in waived]
+            if exact and any(match_words(part, exact, modes=normalized_modes) is not None
+                             for part in [content] + [str(b.get("text") or "") for b in buttons]):
+                return "违禁词"
     if settings.get("block_forward") and (
         message.get("forward_origin") or message.get("forward_from")
         or message.get("forward_from_chat")):
