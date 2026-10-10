@@ -322,8 +322,8 @@ class TelegramAPILatencyTests(unittest.TestCase):
         store = Store(":memory:")
         try:
             bot = GroupBot(api, store, 999, "MyBot")
-            result = bot._edit_or_send(1, 5, "unchanged", [
-                {"text": "刷新", "callback_data": "g:-1001"}])
+            result = bot._edit_or_send(1, 5, "unchanged", [[
+                {"text": "刷新", "callback_data": "g:-1001"}]])
             self.assertTrue(result)
             self.assertFalse(any(m == "sendMessage" for m, _ in sent))
             bot.ocr.shutdown()

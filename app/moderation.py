@@ -1,4 +1,5 @@
 """Conservative group-specific filters. False positives are always possible."""
+from .i18n import msg as _ui, join_text
 import re
 import time
 import unicodedata
@@ -20,20 +21,18 @@ _MENTION = re.compile(r"(?<![\w@])@[a-zA-Z][a-zA-Z0-9_]{4,31}\b")
 _OBFUSCATED_DOT = re.compile(
     r"\s*(?:\[\s*(?:\.|dot)\s*\]|\(\s*(?:\.|dot)\s*\))\s*"
     r"|(?<=\w)\s+\.\s*|\.\s+(?=\w)", re.IGNORECASE)
-WORD_MODES = {"contains": "包含", "word": "整词", "exact": "整句"}
+WORD_MODES = {"contains": _ui('包含'), "word": _ui('整词'), "exact": _ui('整句')}
 
 
 def normalize(value):
     value = unicodedata.normalize("NFKC", str(value)).casefold()
-    return "".join(c for c in value if c not in _ZERO_WIDTH
-                   and unicodedata.category(c) not in ("Cf",)).strip()
+    return join_text('', (c for c in value if c not in _ZERO_WIDTH and unicodedata.category(c) not in ('Cf',))).strip()
 
 
 def compact(value):
     """Opt-in detection of deliberately split keyword characters (not default)."""
     value = normalize(value)
-    return "".join(c for c in value if not unicodedata.category(c).startswith(
-        ("P", "Z", "S", "M")) and not c.isspace())
+    return join_text('', (c for c in value if not unicodedata.category(c).startswith(('P', 'Z', 'S', 'M')) and (not c.isspace())))
 
 
 @lru_cache(maxsize=8)
@@ -44,11 +43,11 @@ def _word_rules(words, exceptions, modes=()):
     for word in words:
         phrase = normalize(word)
         dense = compact(phrase)
-        minimum = 3 if any("\u3400" <= c <= "\u9fff" for c in dense) else 4
+        minimum = 3 if any('\u3400' <= c <= '\u9fff' for c in dense) else 4
         if phrase:
             mode = modes.get(phrase, "contains")
             if mode not in WORD_MODES:
-                raise ValueError("未知关键词匹配方式")
+                raise ValueError(_ui('未知关键词匹配方式'))
             rules.append((word, phrase, dense, mode, len(dense) >= minimum))
     waived = set()
     for rule in exceptions:
@@ -92,7 +91,7 @@ def message_word_hit(message, banned_words, *, loose=False, exceptions=(), modes
     parts = [message.get("text") or message.get("caption") or ""]
     parts += [str(b.get("text") or "") for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
               for b in row if isinstance(b, dict)]
-    clean = normalize("\n".join(parts))
+    clean = normalize(join_text('\n', parts))
     rules = banned_words if isinstance(banned_words, KeywordMatcher) else compile_words(banned_words, modes)
     waived = word_waivers(exceptions)
     hit = rules.find(clean, dense=compact(clean) if loose else None, waived=waived, excluded=excluded)
@@ -246,8 +245,8 @@ class FloodGuard:
             now - tick <= repeat_window and value == fingerprint
             for tick, value, _, _, _ in recent) >= repeat_limit
         media_burst = bool(media) and count_events(media_window, True) > media_limit
-        return ("短时刷屏" if too_many else "媒体刷屏" if media_burst
-                else "重复刷屏" if repeated else None)
+        return (_ui('短时刷屏') if too_many else _ui('媒体刷屏') if media_burst
+                else _ui('重复刷屏') if repeated else None)
 
 
 class PhotoRepeatGuard:
@@ -291,7 +290,7 @@ class PhotoRepeatGuard:
         while len(recent) > 512:
             recent.popleft()
         if len(recent) >= limit:
-            return "重复图片刷屏"
+            return _ui('重复图片刷屏')
         return None
 
 
@@ -301,29 +300,29 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None,
     content = message.get("text") or message.get("caption") or ""
     buttons = [button for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
                for button in row if isinstance(button, dict)]
-    clean = normalize("\n".join([content] + [str(b.get("text") or "") for b in buttons]))
+    clean = normalize(join_text('\n', [content] + [str(b.get('text') or '') for b in buttons]))
     if settings.get("word_filter_enabled", True) and message_word_hit(
             message, banned_words, loose=settings.get("word_loose_match", False),
             exceptions=exceptions, modes=modes) is not None:
-        return "违禁词"
+        return _ui('违禁词')
     if settings.get("block_forward") and (
         message.get("forward_origin") or message.get("forward_from")
         or message.get("forward_from_chat")):
-        return "禁止转发"
+        return _ui('禁止转发')
     if settings.get("block_links"):
         allowlist = [normalize_domain(d) for d in allowed_domains]
         allowlist = [d for d in allowlist if d]
         if any(not allowed(domain, allowlist) for domain in extract_domains(message)):
-            return "外部链接"
+            return _ui('外部链接')
         if any(not allowed(domain, allowlist) for b in buttons
                if (domain := normalize_domain(b.get("url") or ""))):
-            return "外部链接"
+            return _ui('外部链接')
     if settings.get("spam_guard_enabled"):
         if mention_count(message) > settings.get("mention_limit", 5):
-            return "批量提及刷屏"
+            return _ui('批量提及刷屏')
         if settings.get("block_links") and any(
                 not allowed(domain, allowlist) for domain in obfuscated_domains(clean)):
-            return "伪装链接"
+            return _ui('伪装链接')
     if settings.get("anti_flood") and flood is not None and not is_edit:
         user = message.get("from", {}).get("id")
         chat = message.get("chat", {}).get("id")

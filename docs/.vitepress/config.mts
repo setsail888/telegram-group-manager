@@ -37,13 +37,14 @@ export default defineConfig({
       { text: '开始使用', items: [
         { text: '快速开始', link: '/guide/getting-started' },
         { text: '全部功能导航', link: '/guide/features' },
+        { text: '中文 / English 切换', link: '/guide/languages' },
         { text: '权限与按钮操作', link: '/guide/permissions' },
         { text: '常见问题', link: '/guide/faq' },
       ] },
       { text: '群消息防护', collapsed: false, items: [
         { text: '违禁词与匹配方式', link: '/moderation/keywords' },
         { text: '启用分类词库', link: '/moderation/word-packs' },
-        { text: '两字词、繁简与同音', link: '/moderation/variants' },
+        { text: '两字词、同音与拼音混写', link: '/moderation/variants' },
         { text: '导入、导出与精确例外', link: '/moderation/import-export' },
         { text: '智能反垃圾与链接', link: '/moderation/anti-spam' },
         { text: '个人防刷屏与图片', link: '/moderation/anti-flood' },

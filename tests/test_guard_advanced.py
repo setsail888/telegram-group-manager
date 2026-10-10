@@ -135,8 +135,9 @@ class GuardPanelTests(unittest.TestCase):
         page = self.edited()
         self.assertIn("设置「图二样式测试群」", page["text"])
         rows = page["reply_markup"]["inline_keyboard"]
-        self.assertEqual(len(rows), len(MENU_MODULES) // 2)
-        self.assertTrue(all(len(row) == 2 for row in rows))
+        self.assertEqual(len(rows), (len(MENU_MODULES) + 1) // 2)
+        self.assertTrue(all(len(row) == 2 for row in rows[:-1]))
+        self.assertIn(len(rows[-1]), (1, 2))
         self.assertTrue(all(
             len(btn["callback_data"].encode("utf-8")) <= 64
             for row in rows for btn in row))

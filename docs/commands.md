@@ -7,6 +7,7 @@
 | 场景 | 命令 |
 | --- | --- |
 | 查看管理 | /panel、/settings、/check、/id、/stats、/statweek、/top7 |
+| 界面语言 | 私聊 /language；群内 /language 提供私聊入口，详见[语言切换](guide/languages.md) |
 | 外链/刷屏/转发 | /links on、/links off、/flood on、/forward on |
 | 新人验证 | /captcha on（仅超群） |
 | 其他机器人入群拦截 | /bots on、/bots off（默认关闭） |

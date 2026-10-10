@@ -1,4 +1,5 @@
 """SQLite state is scoped to chat_id; no Telegram credentials enter the database."""
+from .i18n import msg as _ui, join_text
 import json
 import os
 import sqlite3
@@ -16,8 +17,8 @@ DEFAULTS = {
     "block_forward": False,
     "anti_flood": True,
     "welcome_enabled": True,
-    "welcome_text": "欢迎 {name} 加入本群！请先阅读 /rules。",
-    "rules_text": "文明交流，禁止广告、诈骗和刷屏。尊重每一位群友。",
+    "welcome_text": _ui('欢迎 {name} 加入本群！请先阅读 /rules。'),
+    "rules_text": _ui('文明交流，禁止广告、诈骗和刷屏。尊重每一位群友。'),
     "verify_enabled": False,
     "verify_timeout": 300,
     "log_chat_id": 0,
@@ -33,6 +34,7 @@ DEFAULTS = {
     "word_traditional_mode": "off",
     "word_homophone_mode": "off",
     "word_short_split_mode": "off",
+    "word_mixed_pinyin_mode": "off",
     "word_filter_enabled": True,
     "word_penalty": "delete",
     "word_mute_minutes": 10,
@@ -132,6 +134,9 @@ class Store:
             CREATE TABLE IF NOT EXISTS chats (
               chat_id INTEGER PRIMARY KEY, title TEXT NOT NULL,
               settings TEXT NOT NULL, updated_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS ui_languages (
+              owner_id INTEGER PRIMARY KEY, locale TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS filters (
               chat_id INTEGER NOT NULL, kind TEXT NOT NULL,
@@ -339,31 +344,29 @@ class Store:
             ("media_id", "TEXT"),
         ):
             if column not in existing:
-                self.db.execute(f"ALTER TABLE replies ADD COLUMN {column} {definition}")
+                self.db.execute(_ui('ALTER TABLE replies ADD COLUMN {p0} {p1}', p0=column, p1=definition))
         audit_columns = {r[1] for r in self.db.execute("PRAGMA table_info(moderation_audit)")}
         for column in ("rule_key", "pack_id", "match_kind", "penalty", "penalty_result"):
             if column not in audit_columns:
-                self.db.execute(f"ALTER TABLE moderation_audit ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+                self.db.execute(_ui("ALTER TABLE moderation_audit ADD COLUMN {p0} TEXT NOT NULL DEFAULT ''", p0=column))
         # Database triggers also invalidate caches after direct SQL/another connection.
         for table in ("filters", "word_modes", "word_packs", "word_exclusions"):
             for operation in ("INSERT", "UPDATE", "DELETE"):
                 row = "OLD" if operation == "DELETE" else "NEW"
                 condition = ""
                 if table == "filters":
-                    condition = f"WHEN {row}.kind IN ('word','word_exception')"
+                    condition = _ui("WHEN {p0}.kind IN ('word','word_exception')", p0=row)
                     if operation == "UPDATE":
                         condition += " OR OLD.kind IN ('word','word_exception')"
-                body = (f"INSERT INTO word_revisions VALUES({row}.chat_id,1) "
-                        "ON CONFLICT(chat_id) DO UPDATE SET version=version+1;")
+                body = (_ui('INSERT INTO word_revisions VALUES({p0}.chat_id,1) ON CONFLICT(chat_id) DO UPDATE SET version=version+1;', p0=row))
                 if operation == "UPDATE":
                     body += ("INSERT INTO word_revisions SELECT OLD.chat_id,1 WHERE OLD.chat_id<>NEW.chat_id "
                              "ON CONFLICT(chat_id) DO UPDATE SET version=version+1;")
-                self.db.execute(f"CREATE TRIGGER IF NOT EXISTS word_rev_{table}_{operation} "
-                                f"AFTER {operation} ON {table} {condition} BEGIN {body} END")
+                self.db.execute(_ui('CREATE TRIGGER IF NOT EXISTS word_rev_{p0}_{p1} AFTER {p2} ON {p3} {p4} BEGIN {p5} END', p0=table, p1=operation, p2=operation, p3=table, p4=condition, p5=body))
 
     def ensure_chat(self, chat_id, title):
         chat_id = int(chat_id)
-        title = str(title or "未命名群组")[:150]
+        title = str(title or _ui('未命名群组'))[:150]
         now = int(time.time())
         self.db.execute(
             "INSERT OR IGNORE INTO chats VALUES(?,?,?,?)",
@@ -375,6 +378,22 @@ class Store:
         row = self.db.execute("SELECT * FROM chats WHERE chat_id=?", (int(chat_id),)).fetchone()
         return dict(row) if row else None
 
+    def ui_language(self, owner_id):
+        row = self.db.execute("SELECT locale FROM ui_languages WHERE owner_id=?", (int(owner_id),)).fetchone()
+        return row[0] if row and row[0] in ("zh-CN", "en") else "zh-CN"
+
+    def has_ui_language(self, owner_id):
+        return self.db.execute("SELECT 1 FROM ui_languages WHERE owner_id=?", (int(owner_id),)).fetchone() is not None
+
+    def set_ui_language(self, owner_id, locale):
+        from .i18n import LOCALES
+        if locale not in LOCALES or not int(owner_id):
+            raise ValueError(_ui('未知界面语言。'))
+        if int(owner_id) < 0 and not self.chat(owner_id):
+            raise ValueError(_ui('该群尚未加入机器人'))
+        self.db.execute("INSERT INTO ui_languages VALUES(?,?) ON CONFLICT(owner_id) DO UPDATE SET locale=excluded.locale",
+                        (int(owner_id), locale))
+
     def chats(self):
         return [dict(r) for r in self.db.execute(
             "SELECT chat_id,title FROM chats ORDER BY updated_at DESC LIMIT 100")]
@@ -382,61 +401,73 @@ class Store:
     def settings(self, chat_id):
         row = self.db.execute("SELECT settings FROM chats WHERE chat_id=?", (int(chat_id),)).fetchone()
         if row is None:
-            raise KeyError("该群尚未加入机器人")
+            raise KeyError(_ui('该群尚未加入机器人'))
         return {**DEFAULTS, **json.loads(row[0])}
+
+    def content_text(self, chat_id, key):
+        """Translate untouched defaults; explicit administrator content stays literal."""
+        if key not in ("welcome_text", "rules_text"):
+            raise KeyError(key)
+        settings = self.settings(chat_id)
+        value = settings[key]
+        if value == DEFAULTS[key] and not settings.get(key+"_customized", False):
+            return DEFAULTS[key]
+        return str(value)
 
     def set(self, chat_id, name, value):
         if name not in DEFAULTS:
-            raise ValueError("未知设置")
+            raise ValueError(_ui('未知设置'))
         settings = self.settings(chat_id)
         if name in TOGGLES and not isinstance(value, bool):
-            raise ValueError("开关必须是布尔值")
+            raise ValueError(_ui('开关必须是布尔值'))
         if name in ("welcome_text", "rules_text") and (not isinstance(value, str) or len(value) > 1500):
-            raise ValueError("文本最多 1500 字")
+            raise ValueError(_ui('文本最多 1500 字'))
         if name == "log_chat_id" and (not isinstance(value, int) or value > 0):
-            raise ValueError("日志目标 ID 必须是负整数或 0")
+            raise ValueError(_ui('日志目标 ID 必须是负整数或 0'))
         if name == "verify_timeout" and (not isinstance(value, int) or not 60 <= value <= 1800):
-            raise ValueError("验证时限为 60-1800 秒")
+            raise ValueError(_ui('验证时限为 60-1800 秒'))
         if name == "checkin_award" and (
             type(value) is not int or not 1 <= value <= 100):
-            raise ValueError("签到基础积分需要在 1 到 100 之间")
+            raise ValueError(_ui('签到基础积分需要在 1 到 100 之间'))
         if name == "repeat_photo_limit" and (
             type(value) is not int or not 2 <= value <= 10):
-            raise ValueError("相同图片触发次数需要在 2 到 10 次之间")
+            raise ValueError(_ui('相同图片触发次数需要在 2 到 10 次之间'))
         if name == "repeat_photo_window" and (
             type(value) is not int or not 30 <= value <= 600):
-            raise ValueError("图片检测时间需要在 30 到 600 秒之间")
+            raise ValueError(_ui('图片检测时间需要在 30 到 600 秒之间'))
         if name == "ocr_mode" and value not in ("off", "review", "delete"):
-            raise ValueError("OCR 模式只能是 off、review、delete")
+            raise ValueError(_ui('OCR 模式只能是 off、review、delete'))
         if name == "ocr_confidence" and (
             type(value) is not int or not 40 <= value <= 95):
-            raise ValueError("OCR 信心阈值范围为 40–95")
+            raise ValueError(_ui('OCR 信心阈值范围为 40–95'))
         if name == "word_penalty" and value not in ("delete", "mute"):
-            raise ValueError("违禁词处罚只能为 delete 或 mute")
+            raise ValueError(_ui('违禁词处罚只能为 delete 或 mute'))
         if name in {row[0] for row in VARIANT_SETTINGS.values()} and value not in PACK_MODES:
-            raise ValueError("变体识别模式只能为 off、observe、enforce")
+            raise ValueError(_ui('变体识别模式只能为 off、observe、enforce'))
         if name == "flood_penalty" and value not in PENALTIES:
-            raise ValueError("未知防刷屏处罚方式")
+            raise ValueError(_ui('未知防刷屏处罚方式'))
         if name == "cross_flood_mode" and value not in ("off", "observe", "enforce"):
-            raise ValueError("跨账号检测模式只能为 off、observe、enforce")
+            raise ValueError(_ui('跨账号检测模式只能为 off、observe、enforce'))
         if name == "word_notice_seconds" and (
             type(value) is not int or value not in (0, 10, 30, 60)):
-            raise ValueError("违禁词删除提醒只能为 0、10、30、60 秒")
+            raise ValueError(_ui('违禁词删除提醒只能为 0、10、30、60 秒'))
         if name == "flood_notice_seconds" and (
             type(value) is not int or value not in (0, 10, 30, 60)):
-            raise ValueError("防刷屏删除提醒只能为 0、10、30、60 秒")
+            raise ValueError(_ui('防刷屏删除提醒只能为 0、10、30、60 秒'))
         if name in NUMBER_LIMITS:
             lo, hi = NUMBER_LIMITS[name]
             if type(value) is not int or not lo <= value <= hi:
-                raise ValueError(f"{name} 的设置范围为 {lo}–{hi}")
+                raise ValueError(_ui('{p0} 的设置范围为 {p1}–{p2}', p0=name, p1=lo, p2=hi))
         settings[name] = value
+        if name in ("welcome_text", "rules_text"):
+            settings[name+"_customized"] = True
         self.db.execute("UPDATE chats SET settings=?,updated_at=? WHERE chat_id=?",
                         (json.dumps(settings, ensure_ascii=False), int(time.time()), int(chat_id)))
         return settings
 
     def add_filter(self, chat_id, kind, key, value):
         if kind not in ("word", "domain", "word_exception"):
-            raise ValueError("未知类型")
+            raise ValueError(_ui('未知类型'))
         if kind == "domain":
             count = self.db.execute("SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
                                     (int(chat_id), kind)).fetchone()[0]
@@ -444,7 +475,7 @@ class Store:
                 "SELECT 1 FROM filters WHERE chat_id=? AND kind=? AND key=?",
                 (int(chat_id), kind, str(key))).fetchone()
             if count >= 300 and not exists:
-                raise ValueError("域名规则最多 300 条")
+                raise ValueError(_ui('域名规则最多 300 条'))
         self.db.execute("INSERT INTO filters VALUES (?,?,?,?) "
                         "ON CONFLICT(chat_id,kind,key) DO UPDATE SET value=excluded.value",
                         (int(chat_id), kind, str(key), str(value)))
@@ -462,7 +493,7 @@ class Store:
     def filter_count(self, chat_id, kind):
         """Count rules without loading their values into the admin panel."""
         if kind not in ("word", "domain", "word_exception"):
-            raise ValueError("未知规则类型")
+            raise ValueError(_ui('未知规则类型'))
         return int(self.db.execute(
             "SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
             (int(chat_id), kind)).fetchone()[0])
@@ -470,9 +501,9 @@ class Store:
     def filter_page(self, chat_id, kind, page=0, page_size=8):
         """User-requested list only; never expand the main panel."""
         if kind != "word":
-            raise ValueError("只支持查看当前群的违禁词列表")
+            raise ValueError(_ui('只支持查看当前群的违禁词列表'))
         if type(page) is not int or page < 0 or page > 2**63 // max(1, page_size)-1:
-            raise ValueError("列表页码无效")
+            raise ValueError(_ui('列表页码无效'))
         return [dict(row) for row in self.db.execute(
             "SELECT key,value FROM filters WHERE chat_id=? AND kind=? "
             "ORDER BY key LIMIT ? OFFSET ?",
@@ -504,9 +535,9 @@ class Store:
     def add_filters_bulk(self, chat_id, kind, entries):
         """All-or-nothing import. Same-group, existing rules may be replaced."""
         if kind not in ("word", "word_exception", "domain"):
-            raise ValueError("仅支持批量导入违禁词、域名或例外短语")
+            raise ValueError(_ui('仅支持批量导入违禁词、域名或例外短语'))
         if not entries or len(entries) > 80:
-            raise ValueError("一次最多提交 80 条规则")
+            raise ValueError(_ui('一次最多提交 80 条规则'))
         unique = {str(key): str(value) for key, value in entries}
         self.db.execute("BEGIN IMMEDIATE")
         try:
@@ -515,7 +546,7 @@ class Store:
                     "SELECT key FROM filters WHERE chat_id=? AND kind=?",
                     (int(chat_id), kind))}
                 if len(existing | set(unique)) > 300:
-                    raise ValueError("超过每群域名 300 条上限，本次没有导入任何规则")
+                    raise ValueError(_ui('超过每群域名 300 条上限，本次没有导入任何规则'))
             for key, value in unique.items():
                 self.db.execute("INSERT INTO filters VALUES (?,?,?,?) "
                                 "ON CONFLICT(chat_id,kind,key) DO UPDATE SET value=excluded.value",
@@ -555,12 +586,12 @@ class Store:
 
     def set_flood_settings(self, chat_id, changes, *, expected):
         if not changes or any(key not in FLOOD_SETTINGS for key in changes):
-            raise ValueError("未知防刷屏设置。")
+            raise ValueError(_ui('未知防刷屏设置。'))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             current = self.settings(chat_id)
             if any(current[key] != value for key, value in expected.items()):
-                raise ValueError("防刷屏设置已变化，请重新预览。")
+                raise ValueError(_ui('防刷屏设置已变化，请重新预览。'))
             for key, value in changes.items():
                 self.set(chat_id, key, value)
             self.db.execute("COMMIT")
@@ -574,12 +605,12 @@ class Store:
 
     def set_variant_modes(self, chat_id, changes, *, expected=None, revision=None):
         if not changes or any(key not in VARIANT_SETTINGS or mode not in PACK_MODES for key, mode in changes.items()):
-            raise ValueError("未知变体识别模式。")
+            raise ValueError(_ui('未知变体识别模式。'))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             if ((expected is not None and self.variant_modes(chat_id) != expected)
                     or revision is not None and self.word_revision(chat_id) != revision):
-                raise ValueError("词库或变体设置已变化，请重新预览。")
+                raise ValueError(_ui('词库或变体设置已变化，请重新预览。'))
             for key, mode in changes.items():
                 self.set(chat_id, VARIANT_SETTINGS[key][0], mode)
             self.db.execute("COMMIT")
@@ -589,11 +620,11 @@ class Store:
 
     def set_pack_modes(self, chat_id, changes, *, expected=None):
         if not changes or any(key not in catalog() or mode not in PACK_MODES for key, mode in changes.items()):
-            raise ValueError("未知词库分类或模式。")
+            raise ValueError(_ui('未知词库分类或模式。'))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             if expected is not None and self.word_revision(chat_id) != expected:
-                raise ValueError("词库已被修改，请重新预览。")
+                raise ValueError(_ui('词库已被修改，请重新预览。'))
             self.db.executemany("INSERT INTO word_packs VALUES(?,?,?) ON CONFLICT(chat_id,pack_id) "
                                 "DO UPDATE SET mode=excluded.mode", [(int(chat_id), key, mode) for key, mode in changes.items()])
             self.db.execute("COMMIT")
@@ -604,11 +635,11 @@ class Store:
     def exclude_word(self, chat_id, word, *, exclude=True, expected=None):
         word = normalize(word)
         if not 2 <= len(word) <= 80:
-            raise ValueError("词条需为2–80字。")
+            raise ValueError(_ui('词条需为2–80字。'))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             if expected is not None and self.word_revision(chat_id) != expected:
-                raise ValueError("词库已被修改，请重新预览。")
+                raise ValueError(_ui('词库已被修改，请重新预览。'))
             if exclude:
                 self.db.execute("INSERT OR IGNORE INTO word_exclusions VALUES(?,?)", (int(chat_id), word))
             else:
@@ -620,11 +651,11 @@ class Store:
 
     def import_words(self, chat_id, entries, *, expected=None):
         if not entries or any(not 2 <= len(key) <= 80 or mode not in WORD_MODES for key, _, mode in entries):
-            raise ValueError("导入词条或匹配方式无效。")
+            raise ValueError(_ui('导入词条或匹配方式无效。'))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             if expected is not None and self.word_revision(chat_id) != expected:
-                raise ValueError("词库已被修改，请重新导入预览。")
+                raise ValueError(_ui('词库已被修改，请重新导入预览。'))
             existing = {r[0] for r in self.db.execute("SELECT key FROM filters WHERE chat_id=? AND kind='word'", (int(chat_id),))}
             added = 0
             for key, label, mode in entries:
@@ -665,12 +696,12 @@ class Store:
     def edit_word_rule(self, chat_id, key, mode, *, expected=None):
         """Set a mode (None deletes). Check preview state under the write lock."""
         if mode is not None and mode not in WORD_MODES:
-            raise ValueError("未知关键词匹配方式")
+            raise ValueError(_ui('未知关键词匹配方式'))
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.word_rule(chat_id, key)
             if not row or expected is not None and row != expected:
-                raise ValueError("关键词已被修改或删除，请重新查看。")
+                raise ValueError(_ui('关键词已被修改或删除，请重新查看。'))
             if mode is None:
                 self.del_filter(chat_id, "word", key)
             else:
@@ -685,7 +716,7 @@ class Store:
     def search_words(self, chat_id, query, page=0):
         query = normalize(query)
         if not 1 <= len(query) <= 80:
-            raise ValueError("搜索词需为1–80字")
+            raise ValueError(_ui('搜索词需为1–80字'))
         # Search literal characters; %, _ and backslash are not wildcards.
         literal = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         where = "chat_id=? AND kind='word' AND (key LIKE ? ESCAPE '\\' OR value LIKE ? ESCAPE '\\')"
@@ -705,7 +736,7 @@ class Store:
 
     def set_raid_until(self, chat_id, until_at):
         if not self.chat(chat_id):
-            raise ValueError("未知群组")
+            raise ValueError(_ui('未知群组'))
         self.db.execute("INSERT INTO raid_state VALUES(?,?) ON CONFLICT(chat_id) "
                         "DO UPDATE SET until_at=excluded.until_at", (int(chat_id), int(until_at)))
 
@@ -737,22 +768,22 @@ class Store:
     def add_reply(self, chat_id, key, keyword, reply,
                   buttons=None, media_type=None, media_id=None):
         if media_type not in (None, "photo", "video", "document", "animation"):
-            raise ValueError("不支持的媒体类型")
+            raise ValueError(_ui('不支持的媒体类型'))
         if media_type and (not media_id or len(media_id) > 512):
-            raise ValueError("Telegram 文件 ID 无效")
+            raise ValueError(_ui('Telegram 文件 ID 无效'))
         if not isinstance(buttons if buttons is not None else [], list):
-            raise ValueError("按钮格式无效")
+            raise ValueError(_ui('按钮格式无效'))
         buttons = [] if buttons is None else buttons
         if len(buttons) > 3 or any(
                 not isinstance(b, dict) or set(b) != {"text", "url"}
                 for b in buttons):
-            raise ValueError("最多允许 3 个链接按钮")
+            raise ValueError(_ui('最多允许 3 个链接按钮'))
         count = self.db.execute("SELECT COUNT(*) FROM replies WHERE chat_id=?",
                                 (int(chat_id),)).fetchone()[0]
         exists = self.db.execute("SELECT 1 FROM replies WHERE chat_id=? AND key=?",
                                  (int(chat_id), str(key))).fetchone()
         if count >= 100 and not exists:
-            raise ValueError("最多 100 条自动回复")
+            raise ValueError(_ui('最多 100 条自动回复'))
         self.db.execute(
             "INSERT OR REPLACE INTO replies "
             "(chat_id,key,keyword,reply,buttons,media_type,media_id) "
@@ -811,21 +842,13 @@ class Store:
     def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None, *, rule_key="", pack_id="", match_kind=""):
         """Bounded metadata only. Observation never enters punitive strike history."""
         if outcome not in ("observed", "deleted", "cleared", "failed") or source not in ("text", "ocr", "channel"):
-            raise ValueError("未知审核状态")
+            raise ValueError(_ui('未知审核状态'))
         when = int(time.time() if now is None else now)
         # A confirmed single deletion may upgrade a bulk submission, while
         # observations/retries must never erase successful cleanup evidence.
         keep = "moderation_audit.outcome='deleted' OR (moderation_audit.outcome='cleared' AND excluded.outcome!='deleted')"
         self.db.execute(
-            "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at,rule_key,pack_id,match_kind) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
-            f"reason=CASE WHEN {keep} THEN moderation_audit.reason ELSE excluded.reason END,"
-            f"outcome=CASE WHEN {keep} THEN moderation_audit.outcome ELSE excluded.outcome END,"
-            f"reviewed_by=CASE WHEN {keep} THEN moderation_audit.reviewed_by ELSE NULL END,"
-            f"rule_key=CASE WHEN {keep} THEN moderation_audit.rule_key ELSE excluded.rule_key END,"
-            f"pack_id=CASE WHEN {keep} THEN moderation_audit.pack_id ELSE excluded.pack_id END,"
-            f"match_kind=CASE WHEN {keep} THEN moderation_audit.match_kind ELSE excluded.match_kind END,"
-            f"created_at=CASE WHEN {keep} THEN moderation_audit.created_at ELSE excluded.created_at END",
+            _ui('INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at,rule_key,pack_id,match_kind) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET reason=CASE WHEN {p0} THEN moderation_audit.reason ELSE excluded.reason END,outcome=CASE WHEN {p1} THEN moderation_audit.outcome ELSE excluded.outcome END,reviewed_by=CASE WHEN {p2} THEN moderation_audit.reviewed_by ELSE NULL END,rule_key=CASE WHEN {p3} THEN moderation_audit.rule_key ELSE excluded.rule_key END,pack_id=CASE WHEN {p4} THEN moderation_audit.pack_id ELSE excluded.pack_id END,match_kind=CASE WHEN {p5} THEN moderation_audit.match_kind ELSE excluded.match_kind END,created_at=CASE WHEN {p6} THEN moderation_audit.created_at ELSE excluded.created_at END', p0=keep, p1=keep, p2=keep, p3=keep, p4=keep, p5=keep, p6=keep),
             (int(chat_id), int(message_id), int(target_id), str(reason)[:100], source, outcome, when,
              str(rule_key or "")[:80], str(pack_id)[:40], str(match_kind)[:80]))
         self.db.execute("DELETE FROM moderation_audit WHERE created_at<?", (when - 30*86400,))
@@ -877,7 +900,7 @@ class Store:
 
     def stats_days(self, chat_id, days=7, now=None):
         if not 1 <= days <= 31:
-            raise ValueError("统计范围仅允许 1-31 天")
+            raise ValueError(_ui('统计范围仅允许 1-31 天'))
         now_dt = datetime.fromtimestamp(time.time() if now is None else now, self.tz)
         first = (now_dt.date() - timedelta(days=days - 1)).isoformat()
         last = now_dt.date().isoformat()
@@ -896,7 +919,7 @@ class Store:
 
     def top_activity(self, chat_id, days=7, limit=10, now=None):
         if not 1 <= days <= 31 or not 1 <= limit <= 25:
-            raise ValueError("排行榜范围无效")
+            raise ValueError(_ui('排行榜范围无效'))
         now_dt = datetime.fromtimestamp(time.time() if now is None else now, self.tz)
         first = (now_dt.date() - timedelta(days=days - 1)).isoformat()
         last = now_dt.date().isoformat()
@@ -915,16 +938,16 @@ class Store:
 
     def add_schedule(self, chat_id, owner_id, title, body, mode, rule, next_run):
         if not self.chat(chat_id):
-            raise ValueError("群组尚未登记")
+            raise ValueError(_ui('群组尚未登记'))
         if mode not in ("once", "daily", "weekly"):
-            raise ValueError("不支持的定时类型")
+            raise ValueError(_ui('不支持的定时类型'))
         if not 1 <= len(title) <= 60 or not 1 <= len(body) <= 3500:
-            raise ValueError("标题最多 60 字，内容最多 3500 字，均不能为空")
+            raise ValueError(_ui('标题最多 60 字，内容最多 3500 字，均不能为空'))
         count = self.db.execute(
             "SELECT count(*) FROM scheduled_messages WHERE chat_id=?",
             (int(chat_id),)).fetchone()[0]
         if count >= 20:
-            raise ValueError("单群最多保存 20 条定时消息，可先删除旧任务")
+            raise ValueError(_ui('单群最多保存 20 条定时消息，可先删除旧任务'))
         cursor = self.db.execute(
             "INSERT INTO scheduled_messages "
             "(chat_id,title,body,mode,rule,next_run,owner_id,created_at) "
@@ -955,7 +978,7 @@ class Store:
             return False
         if enabled:
             if next_run is None:
-                raise ValueError("恢复定时任务时必须重算下次发送时间")
+                raise ValueError(_ui('恢复定时任务时必须重算下次发送时间'))
             self.db.execute(
                 "UPDATE scheduled_messages SET enabled=1,next_run=?,"
                 "failures=0,claim_until=0 WHERE id=? AND chat_id=?",
@@ -1030,7 +1053,7 @@ class Store:
         moment = int(time.time() if now is None else now)
         day = datetime.fromtimestamp(moment, self.tz).date()
         if not self.settings(chat_id)["points_enabled"]:
-            raise ValueError("本群尚未开启签到积分")
+            raise ValueError(_ui('本群尚未开启签到积分'))
         uid, cid = int(user_id), int(chat_id)
         self.db.execute("BEGIN IMMEDIATE")
         try:
@@ -1046,7 +1069,7 @@ class Store:
             award = self.settings(chat_id)["checkin_award"] + min(streak - 1, 6)
             new_balance = old_balance + award
             if new_balance > 1_000_000_000:
-                raise ValueError("积分已达上限")
+                raise ValueError(_ui('积分已达上限'))
             checkins = (row["checkins"] if row else 0) + 1
             self.db.execute(
                 "INSERT INTO point_checkins VALUES(?,?,?,?,?)",
@@ -1071,7 +1094,7 @@ class Store:
     def change_points(self, chat_id, user_id, delta, actor_id, now=None):
         """Manual adjustment with durable audit and protection from negative balances."""
         if type(delta) is not int or delta == 0 or abs(delta) > 10_000:
-            raise ValueError("单次调整必须在 1 到 10000 积分之间")
+            raise ValueError(_ui('单次调整必须在 1 到 10000 积分之间'))
         cid, uid, actor = int(chat_id), int(user_id), int(actor_id)
         moment = int(time.time() if now is None else now)
         self.db.execute("BEGIN IMMEDIATE")
@@ -1082,7 +1105,7 @@ class Store:
             current = row[0] if row else 0
             result = current + delta
             if not 0 <= result <= 1_000_000_000:
-                raise ValueError("调整失败：积分不能为负数，也不能超过上限")
+                raise ValueError(_ui('调整失败：积分不能为负数，也不能超过上限'))
             self.db.execute(
                 "INSERT INTO point_balances (chat_id,user_id,balance) VALUES(?,?,?) "
                 "ON CONFLICT(chat_id,user_id) DO UPDATE SET balance=excluded.balance",

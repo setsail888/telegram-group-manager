@@ -30,7 +30,8 @@ def main():
                         "sequential_reference_ms": round(measure(sequential), 4),
                         "plain_trie_states": len(matcher.plain.edges),
                         "iterations": iterations, "repeats": 3})
-    settings = {"word_traditional_mode": "enforce", "word_homophone_mode": "enforce", "word_short_split_mode": "enforce"}
+    settings = {"word_traditional_mode": "enforce", "word_homophone_mode": "enforce", "word_short_split_mode": "enforce",
+                "word_mixed_pinyin_mode": "enforce"}
     started = time.perf_counter()
     policy = WordPolicy([{"key": word} for word in words], {}, [], {key: "enforce" for key in catalog()}, [])
     variant_scan = lambda: policy.hit({"text": text}, settings=settings)
@@ -39,7 +40,14 @@ def main():
     variant = {"custom_rules": len(words), "packs": len(catalog()), "characters": len(text),
                "all_variants": "enforce", "additional_cold_ms": round(cold_ms, 3),
                "warm_scan_ms": round(measure(variant_scan), 4)}
-    print(json.dumps({"python": sys.version.split()[0], "results": results, "variants": variant}, indent=2))
+    mixed_text = ("Hello，普通群聊讨论软件开发、读书笔记和生活经验。"*40)[:1000]
+    mixed_scan = lambda: policy.hit({"text": mixed_text}, settings=settings)
+    started = time.perf_counter()
+    assert mixed_scan() is None
+    mixed = {"custom_rules": len(words), "packs": len(catalog()), "characters": len(mixed_text),
+             "additional_cold_ms": round((time.perf_counter()-started)*1000, 3),
+             "warm_scan_ms": round(measure(mixed_scan), 4)}
+    print(json.dumps({"python": sys.version.split()[0], "results": results, "variants": variant, "mixed_chat": mixed}, indent=2))
 
 
 if __name__ == "__main__":

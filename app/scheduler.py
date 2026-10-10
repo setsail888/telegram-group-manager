@@ -4,6 +4,7 @@ All times are local to Store.tz. Only group admins may create, pause or remove t
 Delivery is retried after transient failures. Rare duplicate sends are possible
 if the process crashes after Telegram accepts a message but before SQLite commits.
 """
+from .i18n import msg as _ui, join_text
 import logging
 import re
 import time
@@ -14,45 +15,45 @@ from .api import TelegramAPIError
 LOG = logging.getLogger(__name__)
 WEEKDAYS = {
     "mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6,
-    "一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6,
+    _ui('一'): 0, _ui('二'): 1, _ui('三'): 2, _ui('四'): 3, _ui('五'): 4, _ui('六'): 5, _ui('日'): 6, _ui('天'): 6,
 }
 MAX_LATENESS = 6 * 3600
 
 
 def _clock(value):
     if not re.fullmatch(r"\d{2}:\d{2}", value):
-        raise ValueError("时间请使用 24 小时 HH:MM 格式，例如 09:00")
+        raise ValueError(_ui('时间请使用 24 小时 HH:MM 格式，例如 09:00'))
     hour, minute = map(int, value.split(":"))
     if hour > 23 or minute > 59:
-        raise ValueError("时间超出范围")
+        raise ValueError(_ui('时间超出范围'))
     return hour, minute
 
 
 def parse_rule(mode, rule):
     """Canonicalize /schedule input without running arbitrary cron expressions."""
     mode = mode.lower()
-    rule = " ".join(rule.strip().split())
+    rule = join_text(' ', rule.strip().split())
     if mode == "daily":
         _clock(rule)
         return mode, rule
     if mode == "weekly":
         parts = rule.split(" ")
         if len(parts) != 2 or parts[0].lower() not in WEEKDAYS:
-            raise ValueError("周任务格式：weekly mon 09:00（mon 至 sun，或 一 至 日）")
+            raise ValueError(_ui('周任务格式：weekly mon 09:00（mon 至 sun，或 一 至 日）'))
         _clock(parts[1])
         day = next(name for name, index in WEEKDAYS.items()
                    if name in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
                    and index == WEEKDAYS[parts[0].lower()])
-        return mode, f"{day} {parts[1]}"
+        return mode, _ui('{p0} {p1}', p0=day, p1=parts[1])
     if mode == "once":
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", rule):
-            raise ValueError("单次任务格式：once 2026-10-15 09:00")
+            raise ValueError(_ui('单次任务格式：once 2026-10-15 09:00'))
         try:
             datetime.strptime(rule, "%Y-%m-%d %H:%M")
         except ValueError as exc:
-            raise ValueError("日期或时间不存在") from exc
+            raise ValueError(_ui('日期或时间不存在')) from exc
         return mode, rule
-    raise ValueError("只支持 once / daily / weekly 三种定时类型")
+    raise ValueError(_ui('只支持 once / daily / weekly 三种定时类型'))
 
 
 def next_occurrence(mode, rule, tz, after=None):
@@ -63,9 +64,9 @@ def next_occurrence(mode, rule, tz, after=None):
     if mode == "once":
         candidate = datetime.strptime(rule, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
         if candidate.timestamp() <= moment:
-            raise ValueError("单次任务时间必须在未来")
+            raise ValueError(_ui('单次任务时间必须在未来'))
         if candidate.timestamp() > moment + 366 * 86400:
-            raise ValueError("单次任务最长可以设置为未来一年")
+            raise ValueError(_ui('单次任务最长可以设置为未来一年'))
         return int(candidate.timestamp())
     if mode == "daily":
         hour, minute = _clock(rule)
@@ -90,17 +91,17 @@ def parse_new_schedule(command):
     """Syntax: daily 09:00 | 标题 | 内容, weekly mon 09:00 | ... etc."""
     head, sep, remaining = command.partition("|")
     if not sep:
-        raise ValueError("用法：/schedule daily 09:00 | 标题 | 消息内容")
+        raise ValueError(_ui('用法：/schedule daily 09:00 | 标题 | 消息内容'))
     title, sep, body = remaining.partition("|")
     if not sep:
-        raise ValueError("请使用两个竖线 | 分隔时间、标题和消息内容")
+        raise ValueError(_ui('请使用两个竖线 | 分隔时间、标题和消息内容'))
     head = head.strip().split(maxsplit=1)
     if len(head) != 2:
-        raise ValueError("请提供定时类型和时间")
+        raise ValueError(_ui('请提供定时类型和时间'))
     mode, rule = parse_rule(head[0], head[1])
     title, body = title.strip(), body.strip()
     if not 1 <= len(title) <= 60 or not 1 <= len(body) <= 3500:
-        raise ValueError("标题为 1-60 字，内容为 1-3500 字")
+        raise ValueError(_ui('标题为 1-60 字，内容为 1-3500 字'))
     return mode, rule, title, body
 
 
@@ -120,7 +121,7 @@ def process_due_schedules(bot, now=None, limit=10):
             next_run = (next_occurrence(item["mode"], item["rule"], bot.store.tz, moment)
                         if item["mode"] != "once" else None)
             bot.store.finish_schedule(item["id"], sent=False, next_run=next_run, now=moment)
-            bot.log(item["chat_id"], f"定时任务 #{item['id']} 超过 6 小时，已跳过过期发送")
+            bot.log(item["chat_id"], _ui('定时任务 #{p0} 超过 6 小时，已跳过过期发送', p0=item['id']))
             continue
         # Revocation matters: a former group admin must not retain posting rights.
         try:
@@ -135,10 +136,10 @@ def process_due_schedules(bot, now=None, limit=10):
             continue
         if member.get("status") not in ("creator", "administrator"):
             bot.store.toggle_schedule(item["chat_id"], item["id"], False)
-            bot.log(item["chat_id"], f"定时任务 #{item['id']} 创建者已不是管理员，任务已暂停")
+            bot.log(item["chat_id"], _ui('定时任务 #{p0} 创建者已不是管理员，任务已暂停', p0=item['id']))
             continue
         message = bot.send(item["chat_id"],
-                           f"📢 {item['title']}\n\n{item['body']}")
+                           _ui('📢 {p0}\n\n{p1}', p0=item['title'], p1=item['body']))
         if not isinstance(message, dict) or not message.get("message_id"):
             bot.store.schedule_failed(item["id"], now=moment)
             continue

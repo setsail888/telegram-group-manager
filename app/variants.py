@@ -1,4 +1,5 @@
-"""Opt-in, auditable Chinese variants. No general phonetic/fuzzy matching."""
+"""Opt-in Chinese variants; bounded mixed pinyin, no general fuzzy matching."""
+from .i18n import msg as _ui, join_text
 import json
 import re
 import unicodedata
@@ -9,9 +10,10 @@ from .keyword_matcher import Automaton
 from .moderation import compact, normalize
 
 ROOT = Path(__file__).with_name("wordlists")
-VARIANT_SETTINGS = {"traditional": ("word_traditional_mode", "繁简字形"),
-                    "homophone": ("word_homophone_mode", "定向同音／拼音"),
-                    "split": ("word_short_split_mode", "短词拆字增强")}
+VARIANT_SETTINGS = {"traditional": ("word_traditional_mode", _ui('繁简字形')),
+                    "homophone": ("word_homophone_mode", _ui('定向同音／拼音')),
+                    "split": ("word_short_split_mode", _ui('短词拆字增强')),
+                    "pinyin": ("word_mixed_pinyin_mode", _ui('拼音＋中文混写'))}
 _CLAUSES = re.compile(r"([\n\r。！？!?；;]+)")
 
 
@@ -51,7 +53,7 @@ def join_short_gaps(text):
                 continue
         out.append(char)
         pos += 1
-    return "".join(out)
+    return join_text('', out)
 
 
 class AliasIndex:
@@ -87,10 +89,10 @@ class AliasIndex:
             else:
                 out.append(text[pos])
                 pos += 1
-        return "".join(out)
+        return join_text('', out)
 
     def rewrite(self, text):
-        return "".join(part if i % 2 else self.clause(part) for i, part in enumerate(_CLAUSES.split(text)))
+        return join_text('', (part if i % 2 else self.clause(part) for i, part in enumerate(_CLAUSES.split(text))))
 
 
 @lru_cache(maxsize=1)
@@ -103,6 +105,7 @@ class VariantIndex:
         self.entries = [(original, phrase) for original, phrase, dense, mode, _ in rules
                         if mode == "contains" and len(dense) >= 2 and any(map(is_han, phrase))]
         self.engines = {}
+        self.mixed_engines = {}
 
     def engine(self, traditional=False, ocr=False):
         key = (traditional, ocr)
@@ -114,7 +117,14 @@ class VariantIndex:
             self.engines[key] = Automaton(patterns)
         return self.engines[key]
 
-    def find(self, text, *, traditional=False, ocr=False, context="", waived=(), excluded=()):
+    def find(self, text, *, traditional=False, ocr=False, context="", waived=(), excluded=(), pinyin=False,
+             pinyin_encoding=None):
+        if pinyin:
+            from .mixed_pinyin import MixedPinyinIndex
+            if traditional not in self.mixed_engines:
+                self.mixed_engines[traditional] = MixedPinyinIndex(self.entries, simplify if traditional else None)
+            return self.mixed_engines[traditional].find(text, context=context, waived=waived, excluded=excluded,
+                                                       ocr=ocr, encoding=pinyin_encoding)
         best = None
         for index, _ in self.engine(traditional, ocr).matches(text):
             original, phrase = self.entries[index]
@@ -135,7 +145,7 @@ def candidates(message, settings, *, ocr=False):
     parts = [normalize(message.get("text") or message.get("caption") or "")]
     parts += [normalize(b.get("text") or "") for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
               for b in row if isinstance(b, dict)]
-    context = normalize("\n".join(parts))
+    context = normalize(join_text('\n', parts))
     choices = []
     for mask in range(1, 1 << len(active)):
         features = {key for i, (key, _) in enumerate(active) if mask & (1 << i)}
@@ -169,9 +179,14 @@ def candidates(message, settings, *, ocr=False):
                 text = result
             rewritten.append(text)
         if not features <= changed:
-            continue
-        kind = "／".join(label for key, (_, label) in VARIANT_SETTINGS.items() if key in features)
-        yield rewritten, "traditional" in features, observe, kind, context
+            if "pinyin" in features:
+                from .mixed_pinyin import latin_letter
+                if any(any(map(is_han, part)) and any(latin_letter(c) for c in part) for part in rewritten):
+                    changed.add("pinyin")
+            if not features <= changed:
+                continue
+        kind = join_text('／', (label for key, (_, label) in VARIANT_SETTINGS.items() if key in features))
+        yield rewritten, "traditional" in features, observe, kind, context, "pinyin" in features
 
 
 def context_matches(word, text, settings):
@@ -180,6 +195,16 @@ def context_matches(word, text, settings):
         return True
     from .moderation import compile_words
     index = VariantIndex(compile_words([word]).rules)
-    return any(index.find(part, traditional=traditional, context=context)
-               for parts, traditional, _, _, context in candidates({"text": text}, settings)
+    return any(index.find(part, traditional=traditional, context=context, pinyin=pinyin)
+               for parts, traditional, _, _, context, pinyin in candidates({"text": text}, settings)
                for part in parts)
+
+
+def kind_text(value):
+    """Restore only known system labels read back from canonical audit records."""
+    labels = [label for _, label in VARIANT_SETTINGS.values()]
+    for mask in range(1, 1 << len(labels)):
+        label = join_text('／', (label for i, label in enumerate(labels) if mask & (1 << i)))
+        if label == value:
+            return label
+    return str(value)

@@ -1,4 +1,5 @@
 """Admin-configured auto-replies with multiple keywords, safe links and Telegram file_ids."""
+from .i18n import msg as _ui, join_text
 import re
 from urllib.parse import urlsplit
 
@@ -8,13 +9,13 @@ from .moderation import normalize
 def parse_keywords(value):
     fragments = [item.strip() for item in re.split(r"[,，、;；]+", value) if item.strip()]
     if not 1 <= len(fragments) <= 8:
-        raise ValueError("每条自动回复必须包含 1-8 个关键词，以逗号隔开")
+        raise ValueError(_ui('每条自动回复必须包含 1-8 个关键词，以逗号隔开'))
     normalized = [normalize(item) for item in fragments]
     if any(not 2 <= len(item) <= 50 for item in normalized):
-        raise ValueError("每个关键词需为 2-50 个字符")
+        raise ValueError(_ui('每个关键词需为 2-50 个字符'))
     if len(set(normalized)) != len(normalized):
-        raise ValueError("关键词不能重复")
-    return ",".join(sorted(normalized)), "、".join(fragments)
+        raise ValueError(_ui('关键词不能重复'))
+    return join_text(',', sorted(normalized)), join_text('、', fragments)
 
 
 def parse_buttons(value):
@@ -23,17 +24,17 @@ def parse_buttons(value):
         return []
     items = value.split("&&")
     if len(items) > 3:
-        raise ValueError("每条自动回复最多 3 个链接按钮")
+        raise ValueError(_ui('每条自动回复最多 3 个链接按钮'))
     buttons = []
     for item in items:
         label, separator, url = item.strip().rpartition(" - ")
         label, url = label.strip(), url.strip()
         if not separator or not 1 <= len(label) <= 40:
-            raise ValueError("按钮格式：按钮名称 - https://example.com")
+            raise ValueError(_ui('按钮格式：按钮名称 - https://example.com'))
         if url.lower().startswith("t.me/"):
             url = "https://" + url
         if len(url) > 350 or any(c.isspace() for c in url):
-            raise ValueError("链接太长或包含空格")
+            raise ValueError(_ui('链接太长或包含空格'))
         try:
             parsed = urlsplit(url)
             valid = (
@@ -48,7 +49,7 @@ def parse_buttons(value):
         except ValueError:
             valid = False
         if not valid:
-            raise ValueError("按钮链接必须是有效的 HTTPS 地址")
+            raise ValueError(_ui('按钮链接必须是有效的 HTTPS 地址'))
         buttons.append({"text": label, "url": url})
     return buttons
 

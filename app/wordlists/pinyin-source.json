@@ -1,0 +1,11 @@
+{
+  "project": "https://github.com/mozillazg/python-pinyin",
+  "version": "0.55.0",
+  "url": "https://files.pythonhosted.org/packages/b9/7b/4cabc76fcc21c3c7d5c671d8783984d30ac9d3bb387c4ba784fca3cdfa3a/pypinyin-0.55.0-py2.py3-none-any.whl",
+  "sha256": "d53b1e8ad2cdb815fb2cb604ed3123372f5a28c6f447571244aca36fc62a286f",
+  "license": "MIT",
+  "characters": 41923,
+  "generated_sha256": "e89416deba28fc74bced6fd6bc096e5530aa4341062d1f2f70eafcfd6ef2bec1",
+  "license_sha256": "1e6c90014b4912815c296ee64bb6f6280af47e6d4c5d80e86232dfc5defe764c",
+  "conversion": "First listed character reading; lowercase, no tone, u-diaeresis as v. No phrase model."
+}

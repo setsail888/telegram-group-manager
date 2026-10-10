@@ -3,6 +3,7 @@
 No purchases, entry fee, deposits, betting, points stakes or monetary payouts.
 Random winner uses secrets.randbelow, stored permanently; redraw not provided.
 """
+from .i18n import msg as _ui, join_text
 from contextlib import contextmanager
 import secrets
 import time
@@ -30,11 +31,11 @@ class Raffles:
 
     def create(self, chat_id, admin_id, title, now=None):
         if not 2 <= len(title.strip()) <= 100:
-            raise ValueError("免费抽奖标题必须是 2–100 字")
+            raise ValueError(_ui('免费抽奖标题必须是 2–100 字'))
         moment = int(time.time() if now is None else now)
         with self.tx():
             if self.active(chat_id):
-                raise ValueError("本群已有进行中的免费抽奖，先开奖或取消")
+                raise ValueError(_ui('本群已有进行中的免费抽奖，先开奖或取消'))
             cur = self.db.execute(
                 "INSERT INTO raffles(chat_id,title,status,created_by,created_at)"
                 " VALUES(?,?,'open',?,?)",
@@ -46,7 +47,7 @@ class Raffles:
         with self.tx():
             raffle = self.active(chat_id)
             if raffle is None:
-                raise ValueError("当前没有开放的免费抽奖")
+                raise ValueError(_ui('当前没有开放的免费抽奖'))
             already = self.db.execute(
                 "SELECT 1 FROM raffle_entries WHERE raffle_id=? AND user_id=?",
                 (raffle["id"], int(user_id))).fetchone()
@@ -54,7 +55,7 @@ class Raffles:
                 "SELECT count(*) FROM raffle_entries WHERE raffle_id=?",
                 (raffle["id"],)).fetchone()[0]
             if count >= 20000 and not already:
-                raise ValueError("本次活动已满 20000 人")
+                raise ValueError(_ui('本次活动已满 20000 人'))
             cur = self.db.execute(
                 "INSERT OR IGNORE INTO raffle_entries(raffle_id,chat_id,user_id,created_at)"
                 " VALUES(?,?,?,?)",
@@ -67,23 +68,23 @@ class Raffles:
         with self.tx():
             raffle = self.active(chat_id)
             if raffle is None:
-                raise ValueError("没有可开奖的免费抽奖")
+                raise ValueError(_ui('没有可开奖的免费抽奖'))
             if expected_id is not None and raffle["id"] != expected_id:
-                raise ValueError("活动已变化，请重新开奖。")
+                raise ValueError(_ui('活动已变化，请重新开奖。'))
             entrants = [r[0] for r in self.db.execute(
                 "SELECT user_id FROM raffle_entries WHERE raffle_id=? ORDER BY user_id",
                 (raffle["id"],))]
             if not entrants:
-                raise ValueError("没有参与者，不能开奖")
+                raise ValueError(_ui('没有参与者，不能开奖'))
             selected = entrants[secrets.randbelow(len(entrants))] if selected_user is None else selected_user
             if selected not in entrants:
-                raise ValueError("候选报名已失效，请重试。")
+                raise ValueError(_ui('候选报名已失效，请重试。'))
             cursor = self.db.execute(
                 "UPDATE raffles SET status='drawn',winner_id=?,finished_at=? "
                 "WHERE chat_id=? AND id=? AND status='open'",
                 (selected, moment, int(chat_id), raffle["id"]))
             if cursor.rowcount != 1:
-                raise ValueError("活动状态已经变化")
+                raise ValueError(_ui('活动状态已经变化'))
             return {"id": raffle["id"], "title": raffle["title"],
                     "winner_id": selected, "count": len(entrants)}
 

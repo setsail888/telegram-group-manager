@@ -6,6 +6,7 @@ import time
 
 from .api import TelegramAPI, TelegramAPIError
 from .config import Config
+from .command_menu import install_commands
 from .scheduler import process_due_schedules
 from .service import GroupBot
 from .store import Store
@@ -26,22 +27,9 @@ def run(api, store, config):
     # A new dedicated token can safely switch from webhook to polling.
     # No pending updates are deliberately discarded.
     api.call("deleteWebhook", drop_pending_updates=False)
-    api.safe("setMyCommands", commands=[
-        {"command": "start", "description": "打开中文群组管理面板"},
-        {"command": "panel", "description": "群组管理面板"},
-        {"command": "menu", "description": "成员按钮菜单：签到、积分、兑换、抽奖、群规"},
-        {"command": "help", "description": "查看指令"},
-        {"command": "rules", "description": "查看群规"},
-        {"command": "stats", "description": "今日群组数据"},
-        {"command": "statweek", "description": "最近7天群组统计"},
-        {"command": "schedule", "description": "管理员定时公告"},
-        {"command": "guard", "description": "管理员查看反垃圾、防刷屏高级设置"},
-        {"command": "words", "description": "管理员查看本群违禁词"},
-        {"command": "checkin", "description": "签到领取积分（需群管理员启用）"},
-        {"command": "points", "description": "查看自己在本群的积分"},
-        {"command": "pointtop", "description": "查看本群积分排行榜"},
-        {"command": "dban", "description": "回复广告消息静默封禁（管理员）"},
-    ])
+    install_commands(api, "zh-CN")
+    install_commands(api, "zh-CN", language_code="zh")
+    install_commands(api, "en", language_code="en")
     LOG.info("机器人已启动，使用长轮询模式（不暴露 Token）。")
     backoff = 1
     last_cleanup = 0

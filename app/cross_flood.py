@@ -8,7 +8,9 @@ from .moderation import normalize
 from .points import MEMBER_COMMANDS as POINT_COMMANDS
 from .economy_commands import MEMBER_COMMANDS as ECONOMY_COMMANDS
 
-REASON = "跨账号重复刷屏"
+from .i18n import msg as _ui
+
+REASON = _ui("跨账号重复刷屏")
 MEMBER_COMMANDS = POINT_COMMANDS | ECONOMY_COMMANDS | {"help", "rules", "menu", "start"}
 CROSS_KEYS = ("anti_flood", "cross_flood_mode", "cross_flood_limit", "cross_flood_users",
               "cross_flood_window", "cross_flood_min_chars", "observe_only")
