@@ -44,7 +44,7 @@ export default defineConfig({
       { text: '群消息防护', collapsed: false, items: [
         { text: '违禁词与匹配方式', link: '/moderation/keywords' },
         { text: '启用分类词库', link: '/moderation/word-packs' },
-        { text: '两字词、同音与拼音混写', link: '/moderation/variants' },
+        { text: '两字词、同音与拼音变体', link: '/moderation/variants' },
         { text: '导入、导出与精确例外', link: '/moderation/import-export' },
         { text: '智能反垃圾与链接', link: '/moderation/anti-spam' },
         { text: '个人防刷屏与图片', link: '/moderation/anti-flood' },

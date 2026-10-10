@@ -16,7 +16,7 @@ hero:
       text: 第一次使用
       link: /guide/getting-started
     - theme: alt
-      text: 查找功能用法
+      text: 功能作用与用法
       link: /guide/features
     - theme: alt
       text: 安装到服务器
@@ -53,8 +53,10 @@ features:
 | 你想做什么 | 从这里开始 |
 | --- | --- |
 | 第一次部署并加入群组 | [快速开始](guide/getting-started.md) |
+| 看懂每项功能的作用、参数和开关关系 | [全部功能作用与用法](guide/features.md) |
+| 只开智能反垃圾，想知道能拦截哪些消息 | [开关搭配与消息示例](moderation/anti-spam.md#只开启智能反垃圾其他都关闭能做什么) |
 | 更新后找不到新功能，或不知道词库怎么开启 | [启用分类词库](moderation/word-packs.md) |
-| 广告用两个字、同音字或拆字绕过规则 | [中文变体识别](moderation/variants.md) |
+| 广告用两字词、同音字、拼音混写或缩写绕过规则 | [中文变体识别](moderation/variants.md) |
 | 多个账号发送完全一样的广告 | [跨账号重复检测](cross-account-flood.md) |
 | 误删了正常聊天，想知道为什么 | [防护记录与统计](operations/statistics.md) |
 | 安装不停重复、按钮很慢或机器人没有响应 | [故障排查](maintenance/troubleshooting.md) |
