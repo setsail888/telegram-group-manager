@@ -47,13 +47,19 @@ DEFAULTS = {
     "name_length_limit": 40,
     "ocr_mode": "off",
     "ocr_confidence": 75,
+    "observe_only": False,
+    "block_external_channels": False,
+    "album_single_enabled": False,
+    "reply_group_limit": 20,
+    "verify_attempt_limit": 3,
 }
 TOGGLES = {"block_links", "block_forward", "anti_flood", "welcome_enabled",
            "verify_enabled", "block_new_bots", "points_enabled",
            "repeat_photo_enabled", "spam_guard_enabled",
            "word_loose_match", "word_filter_enabled",
            "auto_mute_enabled", "media_flood_enabled",
-           "name_guard_enabled"}
+           "name_guard_enabled", "observe_only", "block_external_channels",
+           "album_single_enabled"}
 
 NUMBER_LIMITS = {
     "flood_limit": (3, 30),
@@ -68,6 +74,14 @@ NUMBER_LIMITS = {
     "name_length_limit": (20, 100),
     "word_mute_minutes": (5, 1440),
     "flood_mute_minutes": (5, 1440),
+    "verify_timeout": (60, 1800),
+    "verify_attempt_limit": (1, 5),
+    "repeat_photo_limit": (2, 10),
+    "repeat_photo_window": (30, 600),
+    "ocr_confidence": (40, 95),
+    "checkin_award": (1, 100),
+    "reply_group_limit": (1, 60),
+    "warn_limit": (1, 10),
 }
 
 
@@ -240,6 +254,28 @@ class Store:
               PRIMARY KEY(raffle_id,user_id)
             );
         """)
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS moderation_audit (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL,
+              target_id INTEGER NOT NULL, reason TEXT NOT NULL,
+              source TEXT NOT NULL, outcome TEXT NOT NULL,
+              reviewed_by INTEGER, created_at INTEGER NOT NULL,
+              UNIQUE(chat_id,message_id,source)
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_chat
+              ON moderation_audit(chat_id,id);
+            CREATE INDEX IF NOT EXISTS idx_audit_time
+              ON moderation_audit(created_at);
+            CREATE TABLE IF NOT EXISTS ui_purchase_requests (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL, token TEXT NOT NULL,
+              UNIQUE(chat_id,user_id,token)
+            );
+        """)
+        pending_columns = {r[1] for r in self.db.execute("PRAGMA table_info(pending)")}
+        if "attempts" not in pending_columns:
+            self.db.execute("ALTER TABLE pending ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
         # Additive migrations for existing installations; preserve old replies.
         existing = {r[1] for r in self.db.execute("PRAGMA table_info(replies)")}
         for column, definition in (
@@ -386,8 +422,8 @@ class Store:
 
     def add_filters_bulk(self, chat_id, kind, entries):
         """All-or-nothing import. Same-group, existing rules may be replaced."""
-        if kind not in ("word", "word_exception"):
-            raise ValueError("仅支持批量导入违禁词或例外短语")
+        if kind not in ("word", "word_exception", "domain"):
+            raise ValueError("仅支持批量导入违禁词、域名或例外短语")
         if not entries or len(entries) > 80:
             raise ValueError("一次最多提交 80 条规则")
         unique = {str(key): str(value) for key, value in entries}
@@ -481,9 +517,47 @@ class Store:
                         (int(chat_id), int(user_id)))
 
     def put_pending(self, chat_id, user_id, nonce, answer, expires_at, message_id=None):
-        self.db.execute("INSERT OR REPLACE INTO pending VALUES(?,?,?,?,?,?)",
+        self.db.execute("INSERT OR REPLACE INTO pending "
+                        "(chat_id,user_id,nonce,answer,expires_at,message_id) VALUES(?,?,?,?,?,?)",
                         (int(chat_id), int(user_id), nonce, int(answer),
                          int(expires_at), message_id))
+
+    def verification_mistake(self, chat_id, user_id):
+        self.db.execute("UPDATE pending SET attempts=attempts+1 WHERE chat_id=? AND user_id=?",
+                        (int(chat_id), int(user_id)))
+        return self.pending(chat_id, user_id)
+
+    def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None):
+        """Bounded metadata only. Observation never enters punitive strike history."""
+        if outcome not in ("observed", "deleted", "failed") or source not in ("text", "ocr", "channel"):
+            raise ValueError("未知审核状态")
+        when = int(time.time() if now is None else now)
+        self.db.execute(
+            "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at) "
+            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
+            "reason=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reason ELSE excluded.reason END,"
+            "outcome=CASE WHEN moderation_audit.outcome='deleted' THEN 'deleted' ELSE excluded.outcome END,"
+            "reviewed_by=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reviewed_by ELSE NULL END,"
+            "created_at=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.created_at ELSE excluded.created_at END",
+            (int(chat_id), int(message_id), int(target_id), str(reason)[:100], source, outcome, when))
+        self.db.execute("DELETE FROM moderation_audit WHERE created_at<?", (when - 30*86400,))
+        self.db.execute("DELETE FROM moderation_audit WHERE chat_id=? AND id NOT IN "
+                        "(SELECT id FROM moderation_audit WHERE chat_id=? ORDER BY id DESC LIMIT 1000)",
+                        (int(chat_id), int(chat_id)))
+
+    def audit_page(self, chat_id, page=0):
+        self.db.execute("DELETE FROM moderation_audit WHERE created_at<?", (int(time.time())-30*86400,))
+        count = self.db.execute("SELECT COUNT(*) FROM moderation_audit WHERE chat_id=?",
+                                (int(chat_id),)).fetchone()[0]
+        pages = max(1, (count + 7) // 8)
+        page = max(0, min(int(page), pages-1))
+        rows = self.db.execute("SELECT * FROM moderation_audit WHERE chat_id=? "
+                               "ORDER BY id DESC LIMIT 8 OFFSET ?", (int(chat_id), page*8))
+        return [dict(r) for r in rows], page, pages
+
+    def review_audit(self, chat_id, event_id, actor):
+        return bool(self.db.execute("UPDATE moderation_audit SET reviewed_by=? "
+                                    "WHERE chat_id=? AND id=?", (int(actor), int(chat_id), int(event_id))).rowcount)
 
     def pending(self, chat_id, user_id):
         row = self.db.execute("SELECT * FROM pending WHERE chat_id=? AND user_id=?",
@@ -547,6 +621,8 @@ class Store:
     def prune_activity(self, now=None, retain_days=30):
         now_dt = datetime.fromtimestamp(time.time() if now is None else now, self.tz)
         cutoff = (now_dt.date() - timedelta(days=retain_days)).isoformat()
+        self.db.execute("DELETE FROM moderation_audit WHERE created_at<?",
+                        (int(now_dt.timestamp())-30*86400,))
         return self.db.execute("DELETE FROM activity WHERE day<?", (cutoff,)).rowcount
 
     def add_schedule(self, chat_id, owner_id, title, body, mode, rule, next_run):

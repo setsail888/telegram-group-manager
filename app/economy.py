@@ -181,11 +181,24 @@ class Economy:
             "UPDATE shop_items SET active=0 WHERE chat_id=? AND id=? AND active=1",
             (int(chat_id), int(item_id))).rowcount)
 
-    def purchase(self, chat_id, user_id, item_id, message_id, now=None):
+    def purchase(self, chat_id, user_id, item_id, message_id, now=None, *, request_key=None):
         cid, uid = _id(chat_id), _id(user_id)
-        _amount(message_id, 2_000_000_000)
+        if request_key is None:
+            _amount(message_id, 2_000_000_000)
+        elif (not isinstance(request_key, str) or not 16 <= len(request_key) <= 64
+              or any(c not in "0123456789abcdef" for c in request_key)):
+            raise ValueError("按钮请求标识无效")
         when = int(time.time() if now is None else now)
         with self.tx():
+            if request_key is not None:
+                self.db.execute("INSERT OR IGNORE INTO ui_purchase_requests(chat_id,user_id,token) "
+                                "VALUES(?,?,?)", (cid,uid,request_key))
+                request = self.db.execute("SELECT id FROM ui_purchase_requests "
+                                          "WHERE chat_id=? AND user_id=? AND token=?",
+                                          (cid,uid,request_key)).fetchone()
+                # Disjoint from positive group-message command ids; private
+                # chats can share message numbers without colliding orders.
+                message_id = -request[0]
             duplicate = self.db.execute(
                 "SELECT id,member_id,status FROM shop_orders "
                 "WHERE chat_id=? AND request_message_id=?",

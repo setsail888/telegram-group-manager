@@ -57,15 +57,20 @@ def extract_tesseract(data):
     return (" ".join(tokens)[:4000], sum(scores) / len(scores))
 
 
-def matched_words(text, confidence, keywords, threshold=65):
+def matched_words(text, confidence, keywords, threshold=65, *, exceptions=()):
     """Return normalized phrases only for high-confidence >=4-character matches."""
     if not text or not math.isfinite(confidence) or confidence < threshold:
         return []
     normalized_text = re.sub(r"[\s\W_]+", "", normalize(text), flags=re.UNICODE)
+    exempt = set()
+    for value in exceptions:
+        phrase, separator, context = normalize(value).partition("|")
+        if separator and normalized_text == re.sub(r"[\s\W_]+", "", context, flags=re.UNICODE):
+            exempt.add(re.sub(r"[\s\W_]+", "", phrase, flags=re.UNICODE))
     hits = []
     for phrase in keywords:
         candidate = re.sub(r"[\s\W_]+", "", normalize(phrase), flags=re.UNICODE)
-        if 4 <= len(candidate) <= 80 and candidate in normalized_text:
+        if 4 <= len(candidate) <= 80 and candidate in normalized_text and candidate not in exempt:
             hits.append(candidate)
     return list(dict.fromkeys(hits))[:4]
 

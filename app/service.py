@@ -6,6 +6,7 @@ import random
 import re
 import secrets
 import time
+from collections import deque
 
 from .api import TelegramAPIError
 from .economy import Economy
@@ -14,6 +15,8 @@ from .moderation import FloodGuard, PhotoRepeatGuard, evaluate, normalize, match
 from .ocr import OCRWorker, MAX_OCR_FILE_BYTES, matched_words
 from .scheduler import format_run, next_occurrence
 from .store import TOGGLES, NUMBER_LIMITS
+from .admin_ui import AdminUI
+from .member_ui import MemberUI
 
 LOG = logging.getLogger(__name__)
 GROUP_TYPES = {"group", "supergroup"}
@@ -40,6 +43,7 @@ MENU_MODULES = (
     ("🎁 积分商城", "shop"), ("📊 今日统计", "stats"),
     ("📈 最近7天", "stats7"), ("🏆 活跃排行", "activity"),
     ("⚙️ 规则总览", "overview"), ("📖 命令指南", "help"),
+    ("🔍 防护记录", "audit"), ("👮 成员管理", "manage"),
     ("🧾 管理日志", "logs"), ("🔄 切换群组", "groups"),
 )
 PAGE_SWITCHES = {
@@ -47,10 +51,14 @@ PAGE_SWITCHES = {
              ("🔗 链接拦截", "block_links"),
              ("🔁 禁止转发", "block_forward"),
              ("🔎 拆字识别", "word_loose_match"),
-             ("⚖️ 自动禁言", "auto_mute_enabled")),
+             ("⚖️ 自动禁言", "auto_mute_enabled"),
+             ("🔍 仅观察内容过滤", "observe_only"),
+             ("📣 拦截外部频道发言", "block_external_channels")),
     "flood": (("🚦 防刷屏", "anti_flood"),
-              ("🖼️ 媒体连发限制", "media_flood_enabled")),
-    "floodmedia": (("🖼️ 媒体连发限制", "media_flood_enabled"),),
+              ("🖼️ 媒体连发限制", "media_flood_enabled"),
+              ("📚 相册按一条计数", "album_single_enabled")),
+    "floodmedia": (("🖼️ 媒体连发限制", "media_flood_enabled"),
+                   ("📚 相册按一条计数", "album_single_enabled")),
     "links": (("🔗 链接拦截", "block_links"),),
     "forward": (("🔁 禁止转发", "block_forward"),),
     "words": (("🔎 拆字违禁词", "word_loose_match"),),
@@ -80,6 +88,14 @@ PAGE_NUMBERS = {
     "floodpenalty": (("flood_mute_minutes", "刷屏禁言分钟", 5),),
     "members": (("name_length_limit", "允许昵称最大长度", 5),),
     "wordpenalty": (("word_mute_minutes", "违禁词禁言分钟", 5),),
+    "verify": (("verify_timeout", "验证时限（秒）", 60),
+               ("verify_attempt_limit", "答错上限", 1)),
+    "photo": (("repeat_photo_limit", "重复图片次数", 1),
+              ("repeat_photo_window", "图片窗口（秒）", 30)),
+    "points": (("checkin_award", "签到基础奖励", 1),),
+    "ocr": (("ocr_confidence", "最低可信度", 5),),
+    "replies": (("reply_group_limit", "全群每分钟回复上限", 1),),
+    "manage": (("warn_limit", "警告上限", 1),),
 }
 WORD_OPERATIONS = {"add", "del", "except", "unexcept", "test"}
 FLOOD_REASONS = frozenset(("短时刷屏", "重复刷屏", "媒体刷屏"))
@@ -108,6 +124,9 @@ class GroupBot:
         self._reply_time = {}
         self._public_command_time = {}
         self._word_wizards = {}  # user_id -> (chat_id, operation, expiry)
+        self.admin_ui = AdminUI(self)
+        self.member_ui = MemberUI(self)
+        self._reply_group_time = {}
         # Rate-limit ALL public moderation reminders per group across modules.
         self._last_moderation_notice = {}
 
@@ -663,6 +682,7 @@ class GroupBot:
             text = self.help_text()
         else:
             text = "该功能暂不可用。"
+        text, keyboard = self.admin_ui.decorate(chat_id, what, text, keyboard)
         keyboard.append([self._button("⬅️ 返回设置", f"g:{chat_id}")])
         return self._edit_or_send(
             user_id, message_id, text, keyboard)
@@ -810,14 +830,23 @@ class GroupBot:
         text = (message.get("text") or "").strip()
         if not uid:
             return
-        cmd = text.split(maxsplit=1)[0].split("@")[0].lower()
+        cmd = text.split(maxsplit=1)[0].split("@")[0].lower() if text else ""
+        if cmd in ("/start", "/groups", "/panel", "/help", "/commands"):
+            self.admin_ui.cancel(uid)
+        elif self.admin_ui.input(message):
+            return
         if cmd == "/cancel" and uid in self._word_wizards:
             chat_id, _operation, _expires = self._word_wizards.pop(uid)
             return self.send(uid, "✅ 已取消本次编辑。",
                              reply_markup=self._word_navigation(chat_id))
         if cmd in ("/start", "/groups", "/panel"):
             self._word_wizards.pop(uid, None)
+            payload = text.partition(" ")[2]
+            if cmd == "/start" and re.fullmatch(r"member_\d{1,18}", payload):
+                return self.member_ui.render(-int(payload[7:]), uid)
             self._private_groups(uid)
+        elif cmd == "/id":
+            self.send(uid, f"🆔 你的 Telegram 数字ID：{uid}")
         elif cmd in ("/help", "/commands"):
             self._word_wizards.pop(uid, None)
             self.send(uid, self.help_text())
@@ -906,6 +935,8 @@ class GroupBot:
         if data.startswith("verify:"):
             self._verify(query)
             return
+        if data.startswith("pc:"):
+            return self.member_ui.callback(query)
         # Management callbacks work only in the requesting user's private chat.
         if chat.get("type") != "private" or chat.get("id") != user_id:
             self.answer(qid, "请私聊机器人操作。", alert=True)
@@ -918,7 +949,7 @@ class GroupBot:
         if len(parts) not in (2, 3, 4, 5) or parts[0] not in (
             "g", "t", "v", "n", "w", "wl", "ws", "wp", "wn",
             "fs", "fp", "fn",
-            "s", "sd", "sp", "sx"):
+            "s", "sd", "sp", "sx", "ad", "ac"):
             self.answer(qid, "未知或失效的按钮")
             return
         try:
@@ -929,6 +960,10 @@ class GroupBot:
         if not self.store.chat(chat_id) or not self.is_admin(chat_id, user_id):
             self.answer(qid, "你不是该群管理员。", alert=True)
             return
+        if parts[0] in ("ad", "ac"):
+            self._word_wizards.pop(user_id, None)
+            return self.admin_ui.callback(query, chat_id, parts)
+        self.admin_ui.cancel(user_id)
         if parts[0] != "w":
             self._word_wizards.pop(user_id, None)
         if parts[0] in ("fs", "fp", "fn"):
@@ -1128,7 +1163,8 @@ class GroupBot:
                           "name_guard_enabled",
                           "block_links", "block_forward", "anti_flood",
                           "repeat_photo_enabled", "spam_guard_enabled",
-                          "word_loose_match", "media_flood_enabled"):
+                          "word_loose_match", "media_flood_enabled",
+                          "block_external_channels"):
             needed = None
         current = self.store.settings(chat_id)[action]
         if needed and not current and not self.bot_can(chat_id, needed):
@@ -1173,8 +1209,13 @@ class GroupBot:
             return self.answer(qid, "验证已失效。", alert=True)
         if pending["expires_at"] <= time.time():
             return self.answer(qid, "验证已过期，请联系管理员。", alert=True)
+        attempt_limit = self.store.settings(chat_id)["verify_attempt_limit"]
+        if pending["attempts"] >= attempt_limit:
+            return self.answer(qid, "答错次数已用完，请联系管理员或等待超时后重新加入。", alert=True)
         if chosen != pending["answer"]:
-            return self.answer(qid, "答案不正确，请重试。", alert=True)
+            pending = self.store.verification_mistake(chat_id, user_id)
+            left = max(0, attempt_limit - pending["attempts"])
+            return self.answer(qid, f"答案不正确，剩余 {left} 次。", alert=True)
         if not self.unrestrict(chat_id, user_id):
             return self.answer(qid, "机器人缺少解除限制的权限，请联系管理员。", alert=True)
         self.store.del_pending(chat_id, user_id)
@@ -1334,6 +1375,29 @@ class GroupBot:
         chat_id = chat["id"]
         sender = message.get("from") or {}
         user_id = sender.get("id")
+        sender_chat = message.get("sender_chat") or {}
+        # Preserve genuine anonymous group admins and linked discussion posts.
+        if sender_chat:
+            if sender_chat.get("id") == chat_id or message.get("is_automatic_forward"):
+                return
+            settings = self.store.settings(chat_id)
+            if not settings["block_external_channels"]:
+                return
+            target = sender_chat.get("id")
+            if not target:
+                return
+            reason = "外部频道发言"
+            if settings["observe_only"]:
+                self.store.audit(chat_id, message["message_id"], target, reason, "observed", "channel")
+                return True
+            deleted = (self.bot_can(chat_id, "can_delete_messages") and self.api.safe(
+                "deleteMessage", chat_id=chat_id, message_id=message["message_id"]) is True)
+            self.store.audit(chat_id, message["message_id"], target, reason,
+                             "deleted" if deleted else "failed", "channel")
+            if deleted:
+                self.store.stat(chat_id, "deleted")
+                self.log(chat_id, "自动删除外部频道发言", target=target)
+            return False
         if not user_id or sender.get("is_bot"):
             return
         # An anonymous administrator sends on behalf of this group.
@@ -1357,8 +1421,6 @@ class GroupBot:
                 message, limit=settings["repeat_photo_limit"],
                 window=settings["repeat_photo_window"])
         if reason:
-            if not self.bot_can(chat_id, "can_delete_messages"):
-                return False
             # Refresh membership only before deletion. An administrator promoted
             # during the short admin-list cache window must never be auto-deleted.
             try:
@@ -1368,8 +1430,16 @@ class GroupBot:
                 return False
             if admin_status(fresh):
                 return True
+            if settings["observe_only"]:
+                self.store.audit(chat_id, message["message_id"], user_id, reason, "observed")
+                return True
+            if not self.bot_can(chat_id, "can_delete_messages"):
+                self.store.audit(chat_id, message["message_id"], user_id, reason, "failed")
+                return False
             deleted = self.api.safe("deleteMessage", chat_id=chat_id,
                                     message_id=message["message_id"])
+            self.store.audit(chat_id, message["message_id"], user_id, reason,
+                             "deleted" if deleted is True else "failed")
             if deleted is True:
                 self.store.stat(chat_id, "deleted")
                 self.log(chat_id, f"自动删除（{reason}）", target=user_id)
@@ -1437,6 +1507,15 @@ class GroupBot:
                 previous = self._reply_time.get(key)
                 if previous is not None and now - previous < 60:
                     continue
+                group_recent = self._reply_group_time.setdefault(chat_id, deque())
+                while group_recent and now - group_recent[0] >= 60:
+                    group_recent.popleft()
+                if len(group_recent) >= settings["reply_group_limit"]:
+                    return True
+                group_recent.append(now)
+                if len(self._reply_group_time) > 1000:
+                    self._reply_group_time = {cid: times for cid, times in self._reply_group_time.items()
+                                              if times and now-times[-1] < 60}
                 self._reply_time[key] = now
                 if len(self._reply_time) > 20000:
                     for old, tick in list(self._reply_time.items()):
@@ -1503,17 +1582,9 @@ class GroupBot:
             matched = matched_words(
                 text, confidence,
                 [r["key"] for r in self.store.filters(cid, "word")],
-                threshold=settings["ocr_confidence"])
+                threshold=settings["ocr_confidence"],
+                exceptions=[r["key"] for r in self.store.filters(cid, "word_exception")])
             if not matched:
-                continue
-            self.store.stat(cid, "ocr_hits")
-            if mode == "review":
-                # No raw image, OCR text, or untrusted URL is stored in logs.
-                self.log(cid, f"🔎 OCR待审核 消息 {event['message_id']}："
-                         f"命中 {','.join(matched)} / 可信度 {confidence:.0f}",
-                         target=uid)
-                continue
-            if mode != "delete" or not self.bot_can(cid, "can_delete_messages"):
                 continue
             try:
                 person = self.api.call("getChatMember", chat_id=cid, user_id=uid)
@@ -1521,8 +1592,20 @@ class GroupBot:
                 continue
             if admin_status(person):
                 continue
+            self.store.stat(cid, "ocr_hits")
+            if mode == "review" or settings["observe_only"]:
+                self.store.audit(cid, event["message_id"], uid, "OCR违禁词", "observed", "ocr")
+                # No raw image, OCR text, or untrusted URL is stored in logs.
+                self.log(cid, f"🔎 OCR待审核 消息 {event['message_id']}："
+                         f"命中 {','.join(matched)} / 可信度 {confidence:.0f}",
+                         target=uid)
+                continue
+            if mode != "delete" or not self.bot_can(cid, "can_delete_messages"):
+                continue
             deleted = self.api.safe(
                 "deleteMessage", chat_id=cid, message_id=event["message_id"])
+            self.store.audit(cid, event["message_id"], uid, "OCR违禁词",
+                             "deleted" if deleted is True else "failed", "ocr")
             if deleted is True:
                 self.store.stat(cid, "deleted")
                 self.store.stat(cid, "ocr_deleted")

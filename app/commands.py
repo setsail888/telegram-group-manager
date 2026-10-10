@@ -39,7 +39,7 @@ ADMIN_ONLY = {
     "guard", "guardset", "addwords", "delwords",
     "wordtest", "wordexcept", "delwordexcept",
 } | POINT_ADMIN_COMMANDS | ECONOMY_ADMIN_COMMANDS
-COMMANDS = ADMIN_ONLY | POINT_MEMBER_COMMANDS | ECONOMY_MEMBER_COMMANDS | {"help", "rules"}
+COMMANDS = ADMIN_ONLY | POINT_MEMBER_COMMANDS | ECONOMY_MEMBER_COMMANDS | {"help", "rules", "menu"}
 
 
 def _deny_if_missing(bot, chat_id, permission, label):
@@ -227,7 +227,7 @@ def handle_command(bot, message):
     chat_id = message["chat"]["id"]
     sender = message.get("from") or {}
     user_id = sender.get("id")
-    if command in ("rules", "help"):
+    if command in ("rules", "help", "menu"):
         # Don't let a non-admin cloak advertising text inside /rules URL.
         if argument.strip() or not user_id:
             return False
@@ -241,7 +241,13 @@ def handle_command(bot, message):
             for old, tick in list(bot._public_command_time.items()):
                 if now - tick > 60:
                     del bot._public_command_time[old]
-        if command == "rules":
+        if command == "menu":
+            if sender.get("is_bot") or message.get("sender_chat"):
+                return False
+            bot.send(chat_id, "👤 点击打开本群成员服务：签到、积分、商城、订单、免费抽奖和群规。",
+                     reply_markup={"inline_keyboard": [[{"text": "👤 成员服务",
+                     "url": f"https://t.me/{bot.username}?start=member_{abs(chat_id)}"}]]})
+        elif command == "rules":
             bot.send(chat_id, f"📖 群规\n{bot.store.settings(chat_id)['rules_text']}")
         else:
             bot.send(chat_id, bot.help_text())
@@ -268,7 +274,9 @@ def handle_command(bot, message):
                      f"删除消息：{'✅' if bot.bot_can(chat_id, 'can_delete_messages') else '❌'}\n"
                      f"限制成员：{'✅' if bot.bot_can(chat_id, 'can_restrict_members') else '❌'}")
         elif command == "id":
-            bot.send(chat_id, f"🆔 当前群组 ID：{chat_id}")
+            target = _target_from_reply(message)
+            bot.send(chat_id, f"🆔 当前群组 ID：{chat_id}\n你的ID：{user_id}"
+                     + (f"\n回复成员ID：{target}" if target else ""))
         elif command == "stats":
             data = bot.store.stats(chat_id)
             bot.send(chat_id, f"📊 今日消息 {data.get('messages',0)} | "

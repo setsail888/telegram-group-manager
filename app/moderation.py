@@ -172,7 +172,7 @@ class FloodGuard:
     def check(self, chat_id, user_id, text, now=None, *,
               limit=None, window=None, repeat_limit=None, repeat_window=None,
               media=None, media_limit=5, media_window=20, loose=False,
-              message_id=None):
+              message_id=None, album_id=None):
         now = time.monotonic() if now is None else now
         key = (chat_id, user_id)
         # Retain the longest configurable window, not just 60 seconds.
@@ -196,18 +196,20 @@ class FloodGuard:
         normalized = compact(text) if loose else normalize(text)
         # Compare complete content without keeping thousands of long messages.
         fingerprint = sha256(normalized.encode("utf-8")).digest() if normalized else None
-        recent.append((now, fingerprint, media, message_id))
+        recent.append((now, fingerprint, media, message_id, album_id))
         # Bound a single very active member's history as well as the number
         # of tracked members; configured thresholds never exceed 30/300 sec.
         while len(recent) > 512:
             recent.popleft()
-        too_many = sum(now - tick <= window for tick, _, _, _ in recent) > limit
+        def count_events(seconds, only_media=False):
+            return len({("album", row[4]) if row[4] else ("message", index)
+                        for index, row in enumerate(recent)
+                        if now-row[0] <= seconds and (not only_media or row[2] is not None)})
+        too_many = count_events(window) > limit
         repeated = fingerprint is not None and sum(
             now - tick <= repeat_window and value == fingerprint
-            for tick, value, _, _ in recent) >= repeat_limit
-        media_burst = bool(media) and sum(
-            now - tick <= media_window and kind is not None
-            for tick, _, kind, _ in recent) > media_limit
+            for tick, value, _, _, _ in recent) >= repeat_limit
+        media_burst = bool(media) and count_events(media_window, True) > media_limit
         return ("短时刷屏" if too_many else "媒体刷屏" if media_burst
                 else "重复刷屏" if repeated else None)
 
@@ -261,7 +263,9 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None,
              *, exceptions=(), is_edit=False):
     """Return one Chinese reason or None. Call only after bot/admin exemption checks."""
     content = message.get("text") or message.get("caption") or ""
-    clean = normalize(content)
+    buttons = [button for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
+               for button in row if isinstance(button, dict)]
+    clean = normalize("\n".join([content] + [str(b.get("text") or "") for b in buttons]))
     if settings.get("word_filter_enabled", True) and match_words(
             clean, banned_words, loose=settings.get("word_loose_match", False),
             exceptions=exceptions) is not None:
@@ -274,6 +278,9 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None,
         allowlist = [normalize_domain(d) for d in allowed_domains]
         allowlist = [d for d in allowlist if d]
         if any(not allowed(domain, allowlist) for domain in extract_domains(message)):
+            return "外部链接"
+        if any(not allowed(domain, allowlist) for b in buttons
+               if (domain := normalize_domain(b.get("url") or ""))):
             return "外部链接"
     if settings.get("spam_guard_enabled"):
         if mention_count(message) > settings.get("mention_limit", 5):
@@ -295,5 +302,6 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None,
                 media_limit=settings.get("media_flood_limit", 5),
                 media_window=settings.get("media_flood_window", 20),
                 loose=settings.get("word_loose_match", False),
-                message_id=message.get("message_id"))
+                message_id=message.get("message_id"),
+                album_id=message.get("media_group_id") if settings.get("album_single_enabled") else None)
     return None
