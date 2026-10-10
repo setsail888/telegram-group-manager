@@ -23,6 +23,9 @@ from .word_ui import WordUI
 from .word_library import describe_hit
 from .variants import context_matches
 from .membership import is_current_member
+from .cross_flood import CrossAccountGuard, REASON as CROSS_REASON
+from .flood_penalty import penalty_label, apply_penalty
+from .flood_ui import FloodUI
 
 LOG = logging.getLogger(__name__)
 GROUP_TYPES = {"group", "supergroup"}
@@ -93,7 +96,12 @@ PAGE_NUMBERS = {
                     ("repeat_window", "重复判断（秒）", 5)),
     "floodmedia": (("media_flood_limit", "媒体连发条数", 1),
                    ("media_flood_window", "媒体窗口（秒）", 5)),
-    "floodpenalty": (("flood_mute_minutes", "刷屏禁言分钟", 5),),
+    "floodpenalty": (("flood_mute_minutes", "刷屏禁言分钟", 5),
+                     ("warn_limit", "警告上限（与手动共用）", 1)),
+    "crossflood": (("cross_flood_limit", "同内容总条数", 1),
+                   ("cross_flood_users", "不同账号数", 1),
+                   ("cross_flood_window", "检测窗口（秒）", 5),
+                   ("cross_flood_min_chars", "文字最小长度", 1)),
     "members": (("name_length_limit", "允许昵称最大长度", 5),),
     "wordpenalty": (("word_mute_minutes", "违禁词禁言分钟", 5),),
     "verify": (("verify_timeout", "验证时限（秒）", 60),
@@ -110,7 +118,7 @@ PAGE_NUMBERS = {
     "welcome": (("welcome_limit", "每分钟欢迎上限", 1),),
 }
 WORD_OPERATIONS = {"add", "del", "except", "unexcept", "test"}
-FLOOD_REASONS = frozenset(("短时刷屏", "重复刷屏", "媒体刷屏"))
+FLOOD_REASONS = frozenset(("短时刷屏", "重复刷屏", "媒体刷屏", CROSS_REASON))
 
 
 def admin_status(member):
@@ -125,6 +133,8 @@ class GroupBot:
         self.username = username
         self.owner_ids = owner_ids
         self.flood = FloodGuard()
+        self.cross_guard = CrossAccountGuard()
+        self.flood_ui = FloodUI(self)
         self.photo_guard = PhotoRepeatGuard()
         self.join_guard = JoinGuard()
         self.word_ui = WordUI(self)
@@ -372,7 +382,8 @@ class GroupBot:
                 f"重复：{conf['repeat_window']} 秒 / {conf['repeat_limit']} 次\n"
                 f"媒体连发：{'✅ 开启' if conf['media_flood_enabled'] else '关闭'}"
                 f"（{conf['media_flood_window']} 秒 / 超过 {conf['media_flood_limit']} 条）\n"
-                f"惩罚：{'单次仅删除触发消息' if conf['flood_penalty'] == 'delete' else '删除并禁言 ' + str(conf['flood_mute_minutes']) + ' 分钟'}\n"
+                f"跨账号重复：{'关闭' if conf['cross_flood_mode'] == 'off' else '仅观察' if conf['cross_flood_mode'] == 'observe' else '自动清理'}\n"
+                f"惩罚：{penalty_label(conf)}\n"
                 f"删除提醒：{str(conf['flood_notice_seconds']) + ' 秒后撤回' if conf['flood_notice_seconds'] else '关闭（静默）'}"
             )
             if conf["auto_mute_enabled"] and conf["flood_penalty"] == "delete":
@@ -386,6 +397,7 @@ class GroupBot:
                  self._button("🖼️ 媒体连发", f"v:{chat_id}:floodmedia")],
                 [self._button("⚖️ 惩罚", f"v:{chat_id}:floodpenalty"),
                  self._button("🕒 删除提醒", f"v:{chat_id}:floodnotice")],
+                [self._button("👥 跨账号重复", f"v:{chat_id}:crossflood")],
             ])
         elif what in ("floodcount", "floodinterval", "floodrepeat", "floodmedia"):
             labels = {
@@ -398,11 +410,7 @@ class GroupBot:
                 seconds = conf["media_flood_window"]
                 limit = conf["media_flood_limit"]
                 enabled = conf["media_flood_enabled"] and conf["anti_flood"]
-                penalty = (
-                    "删除触发消息"
-                    if conf["flood_penalty"] == "delete"
-                    else f"删除并禁言 {conf['flood_mute_minutes']} 分钟"
-                )
+                penalty = "删除触发消息" if conf["flood_penalty"] == "delete" else penalty_label(conf)
                 notification = (
                     "静默清理，不在群内发提示"
                     if conf["flood_notice_seconds"] == 0
@@ -441,21 +449,14 @@ class GroupBot:
                         "点击下方 ➖ / ➕ 调整，仅对当前群生效。")
             keyboard.append([self._button("⬅️ 返回防刷屏", f"v:{chat_id}:flood")])
         elif what == "floodpenalty":
-            text = (
-                "⚖️ 反刷屏惩罚\n\n"
-                f"当前：{'仅删除触发消息' if conf['flood_penalty'] == 'delete' else '删除消息并临时禁言'}\n"
-                f"禁言时长：{conf['flood_mute_minutes']} 分钟\n"
-                "默认只删触发违规的消息；不回溯删除正常消息。\n"
-                "临时禁言仅限超级群，需要机器人拥有删除消息和限制成员权限。\n"
-                "与全局累计违规禁言不会在同一次违规中重复禁言。"
-            )
-            if conf["auto_mute_enabled"] and conf["flood_penalty"] == "delete":
-                text += "\n⚠️ 全局累计违规禁言已开启，「单次仅删除」不代表永久免于累计处罚。"
-            keyboard.extend([
-                [self._button("✅ 仅删除", f"fp:{chat_id}:delete"),
-                 self._button("🔇 删除并禁言", f"fp:{chat_id}:mute")],
-                [self._button("⬅️ 返回防刷屏", f"v:{chat_id}:flood")],
-            ])
+            text, controls = self.flood_ui.penalties(chat_id)
+            keyboard.extend(controls)
+        elif what == "crossflood":
+            text, controls = self.flood_ui.cross(chat_id)
+            keyboard.extend(controls)
+        elif what in ("floodmutetime", "floodbantime"):
+            text, controls = self.flood_ui.duration(chat_id, ban=what == "floodbantime")
+            keyboard.extend(controls)
         elif what == "floodnotice":
             text = (
                 "🕒 反刷屏删除提醒\n\n"
@@ -1437,9 +1438,70 @@ class GroupBot:
                 cid: last for cid, last in self._last_moderation_notice.items()
                 if tick - last < 3600}
 
+    def _prepare_cross_flood(self, event, settings, current):
+        if event is None:
+            return None
+        cid = current["chat"]["id"]
+        rows = [r for r in event["rows"] if not r["processed"]] if event["active"] else event["rows"]
+        people, valid = {}, []
+        for row in rows:
+            uid = row["uid"]
+            if uid not in people:
+                try:
+                    person = self.api.call("getChatMember", chat_id=cid, user_id=uid)
+                except TelegramAPIError:
+                    return None
+                if not isinstance(person, dict) or person.get("status") not in ADMIN_STATUSES | {"member", "restricted", "left", "kicked"}:
+                    return None
+                people[uid] = person
+            if admin_status(people[uid]) or uid == self.bot_id or (people[uid].get("user") or {}).get("is_bot"):
+                self.cross_guard.invalidate(cid, row["mid"])
+            else:
+                valid.append(row)
+        if not any(r["mid"] == current["message_id"] for r in valid):
+            return None
+        if not event["active"] and (len(valid) < settings["cross_flood_limit"]
+                or len({r["uid"] for r in valid}) < settings["cross_flood_users"]):
+            return None
+        event["rows"], event["people"] = valid, people
+        self.cross_guard.activate(event, settings["cross_flood_window"])
+        return event
+
+    def _cleanup_cross_flood(self, event, current):
+        cid, mid = current["chat"]["id"], current["message_id"]
+        people, rows = {}, []
+        for row in event["rows"]:
+            if row["processed"] or row["mid"] == mid:
+                continue
+            uid = row["uid"]
+            if uid not in people:
+                try:
+                    people[uid] = self.api.call("getChatMember", chat_id=cid, user_id=uid)
+                except TelegramAPIError:
+                    people[uid] = None
+            person = people[uid]
+            if not isinstance(person, dict) or person.get("status") not in {"member", "restricted", "left", "kicked"}:
+                continue
+            rows.append(row)
+        if not rows or not self.bot_can(cid, "can_delete_messages"):
+            return
+        success = self.api.safe("deleteMessages", chat_id=cid, message_ids=[r["mid"] for r in rows]) is True
+        for row in rows:
+            # Telegram skips absent IDs in bulk deletion; distinguish request
+            # success from a confirmed individual deletion and don't punish.
+            self.store.audit(cid, row["mid"], row["uid"], CROSS_REASON,
+                             "cleared" if success else "failed")
+            if success:
+                self.cross_guard.mark_processed(cid, row["mid"])
+        if success:
+            self.store.stat(cid, "cross_cleanup_requested", len(rows))
+        self.log(cid, f"跨账号重复：批量清理{'已提交' if success else '失败'}，{len(rows)}条；早先作者不追加处罚")
+
     def _moderate(self, message, *, is_edit=False):
         chat = message["chat"]
         chat_id = chat["id"]
+        if is_edit:
+            self.cross_guard.invalidate(chat_id, message.get("message_id"))
         sender = message.get("from") or {}
         user_id = sender.get("id")
         sender_chat = message.get("sender_chat") or {}
@@ -1476,6 +1538,7 @@ class GroupBot:
         if user_id in admin_ids:
             return
         settings = self.store.settings(chat_id)
+        cross = self._prepare_cross_flood(self.cross_guard.check(message, settings, is_edit=is_edit), settings, message)
         policy = self.store.word_policy(chat_id)
         reason = evaluate(message, settings,
                           policy.custom,
@@ -1483,6 +1546,13 @@ class GroupBot:
                           self.flood,
                           exceptions=policy.exceptions,
                           is_edit=is_edit)
+        if cross:
+            if settings["observe_only"] or settings["cross_flood_mode"] == "observe":
+                self.store.audit(chat_id, message["message_id"], user_id, CROSS_REASON, "observed")
+                for row in cross["rows"]:
+                    self.cross_guard.mark_processed(chat_id, row["mid"])
+            else:
+                reason = CROSS_REASON
         if not reason and not is_edit and settings["repeat_photo_enabled"]:
             reason = self.photo_guard.check(
                 message, limit=settings["repeat_photo_limit"],
@@ -1495,19 +1565,24 @@ class GroupBot:
             word_hit = policy.hit(message, loose=settings["word_loose_match"], settings=settings)
             if word_hit:
                 reason = "违禁词"
+        if not reason and cross:
+            reason = CROSS_REASON
         if reason:
             # Refresh membership only before deletion. An administrator promoted
             # during the short admin-list cache window must never be auto-deleted.
             try:
-                fresh = self.api.call("getChatMember", chat_id=chat_id, user_id=user_id)
+                fresh = cross["people"][user_id] if cross else self.api.call("getChatMember", chat_id=chat_id, user_id=user_id)
             except TelegramAPIError:
                 # Missing membership evidence is not permission to delete.
+                return False
+            if not isinstance(fresh, dict) or fresh.get("status") not in ADMIN_STATUSES | {"member", "restricted", "left", "kicked"}:
                 return False
             if admin_status(fresh):
                 return True
             details = {"rule_key": word_hit["word"], "pack_id": word_hit["pack"],
                        "match_kind": word_hit.get("match_kind", "")} if word_hit else {}
-            if settings["observe_only"] or word_hit and word_hit["observe"]:
+            if (settings["observe_only"] or word_hit and word_hit["observe"]
+                    or reason == CROSS_REASON and settings["cross_flood_mode"] == "observe"):
                 self.store.audit(chat_id, message["message_id"], user_id, reason, "observed", **details)
                 return True
             if not self.bot_can(chat_id, "can_delete_messages"):
@@ -1518,6 +1593,9 @@ class GroupBot:
             self.store.audit(chat_id, message["message_id"], user_id, reason,
                              "deleted" if deleted is True else "failed", **details)
             if deleted is True:
+                self.cross_guard.mark_processed(chat_id, message["message_id"])
+                if reason == CROSS_REASON:
+                    self._cleanup_cross_flood(cross, message)
                 self.store.stat(chat_id, "deleted")
                 self.log(chat_id, f"自动删除（{reason}）", target=user_id)
                 flood_reason = reason in FLOOD_REASONS
@@ -1525,10 +1603,13 @@ class GroupBot:
                 specific_minutes = (
                     settings["word_mute_minutes"]
                     if keyword_reason and settings["word_penalty"] == "mute"
-                    else settings["flood_mute_minutes"]
-                    if flood_reason and settings["flood_penalty"] == "mute"
                     else None)
                 specific_muted = False
+                specific_handled = flood_reason and settings["flood_penalty"] != "delete"
+                if flood_reason:
+                    result = apply_penalty(self, chat_id, user_id, message["message_id"], settings, is_edit=is_edit)
+                    if result is not None:
+                        self.store.audit_penalty(chat_id, message["message_id"], user_id, settings["flood_penalty"], result)
                 if (specific_minutes is not None and not is_edit
                         and fresh.get("status") in ("member", "restricted")
                         and self.is_supergroup(chat_id)
@@ -1551,7 +1632,7 @@ class GroupBot:
                     self._post_moderation_notice(
                         chat_id, "防刷屏", settings["flood_notice_seconds"])
                 if (settings["auto_mute_enabled"] and not is_edit
-                        and not specific_muted):
+                        and not specific_muted and not specific_handled):
                     history = self.store.record_moderation(
                         chat_id, user_id, message["message_id"], reason)
                     threshold = settings["auto_mute_after"]
@@ -1704,6 +1785,7 @@ class GroupBot:
             self.store.audit(cid, event["message_id"], uid, "OCR违禁词",
                              "deleted" if deleted is True else "failed", "ocr", **details)
             if deleted is True:
+                self.cross_guard.mark_processed(cid, event["message_id"])
                 self.store.stat(cid, "deleted")
                 self.store.stat(cid, "ocr_deleted")
                 self.log(cid, f"🔎 OCR自动删除消息 {event['message_id']}："

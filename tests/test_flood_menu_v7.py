@@ -67,8 +67,8 @@ class FloodMenuTests(unittest.TestCase):
         self.assertIn("删除提醒：关闭（静默）", view["text"])
         self.assertLess(len(view["text"]), 250)
         rows = view["reply_markup"]["inline_keyboard"]
-        self.assertEqual(len(rows), 5)  # status, 3 module rows, back
-        self.assertEqual(list(map(len, rows)), [2, 2, 2, 2, 1])
+        self.assertEqual(len(rows), 6)  # status, 3 module rows, cross-account, back
+        self.assertEqual(list(map(len, rows)), [2, 2, 2, 2, 1, 1])
         actual = self.button_values()
         for callback in (
             "fs:-1001:on", "fs:-1001:off",

@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from .moderation import WORD_MODES, normalize
 from .word_library import WordPolicy, catalog, PACK_MODES
 from .variants import VARIANT_SETTINGS
+from .flood_penalty import FLOOD_SETTINGS, PENALTIES
 
 DEFAULTS = {
     "block_links": True,
@@ -42,6 +43,12 @@ DEFAULTS = {
     "repeat_window": 45,
     "flood_penalty": "delete",
     "flood_mute_minutes": 10,
+    "flood_ban_minutes": 1440,
+    "cross_flood_mode": "off",
+    "cross_flood_limit": 5,
+    "cross_flood_users": 3,
+    "cross_flood_window": 60,
+    "cross_flood_min_chars": 8,
     "flood_notice_seconds": 0,
     "media_flood_limit": 5,
     "media_flood_window": 20,
@@ -85,7 +92,12 @@ NUMBER_LIMITS = {
     "auto_mute_minutes": (1, 1440),
     "name_length_limit": (20, 100),
     "word_mute_minutes": (5, 1440),
-    "flood_mute_minutes": (5, 1440),
+    "flood_mute_minutes": (1, 525600),
+    "flood_ban_minutes": (0, 525600),
+    "cross_flood_limit": (3, 30),
+    "cross_flood_users": (2, 30),
+    "cross_flood_window": (5, 300),
+    "cross_flood_min_chars": (2, 200),
     "verify_timeout": (60, 1800),
     "verify_attempt_limit": (1, 5),
     "repeat_photo_limit": (2, 10),
@@ -304,6 +316,12 @@ class Store:
               ON moderation_audit(chat_id,id);
             CREATE INDEX IF NOT EXISTS idx_audit_time
               ON moderation_audit(created_at);
+            CREATE TABLE IF NOT EXISTS auto_flood_actions (
+              chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+              mode TEXT NOT NULL, created_at INTEGER NOT NULL,
+              PRIMARY KEY(chat_id,message_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_flood_action_time ON auto_flood_actions(created_at);
             CREATE TABLE IF NOT EXISTS ui_purchase_requests (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL, token TEXT NOT NULL,
@@ -323,7 +341,7 @@ class Store:
             if column not in existing:
                 self.db.execute(f"ALTER TABLE replies ADD COLUMN {column} {definition}")
         audit_columns = {r[1] for r in self.db.execute("PRAGMA table_info(moderation_audit)")}
-        for column in ("rule_key", "pack_id", "match_kind"):
+        for column in ("rule_key", "pack_id", "match_kind", "penalty", "penalty_result"):
             if column not in audit_columns:
                 self.db.execute(f"ALTER TABLE moderation_audit ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
         # Database triggers also invalidate caches after direct SQL/another connection.
@@ -397,8 +415,10 @@ class Store:
             raise ValueError("违禁词处罚只能为 delete 或 mute")
         if name in {row[0] for row in VARIANT_SETTINGS.values()} and value not in PACK_MODES:
             raise ValueError("变体识别模式只能为 off、observe、enforce")
-        if name == "flood_penalty" and value not in ("delete", "mute"):
-            raise ValueError("防刷屏处罚只能为 delete 或 mute")
+        if name == "flood_penalty" and value not in PENALTIES:
+            raise ValueError("未知防刷屏处罚方式")
+        if name == "cross_flood_mode" and value not in ("off", "observe", "enforce"):
+            raise ValueError("跨账号检测模式只能为 off、observe、enforce")
         if name == "word_notice_seconds" and (
             type(value) is not int or value not in (0, 10, 30, 60)):
             raise ValueError("违禁词删除提醒只能为 0、10、30、60 秒")
@@ -532,6 +552,21 @@ class Store:
         while len(self._word_cache) > 8:
             self._word_cache.popitem(last=False)
         return policy
+
+    def set_flood_settings(self, chat_id, changes, *, expected):
+        if not changes or any(key not in FLOOD_SETTINGS for key in changes):
+            raise ValueError("未知防刷屏设置。")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            current = self.settings(chat_id)
+            if any(current[key] != value for key, value in expected.items()):
+                raise ValueError("防刷屏设置已变化，请重新预览。")
+            for key, value in changes.items():
+                self.set(chat_id, key, value)
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
 
     def variant_modes(self, chat_id):
         settings = self.settings(chat_id)
@@ -758,21 +793,39 @@ class Store:
                         (int(chat_id), int(user_id)))
         return self.pending(chat_id, user_id)
 
+    def claim_flood_penalty(self, chat_id, user_id, message_id, mode):
+        now = int(time.time())
+        claimed = bool(self.db.execute("INSERT OR IGNORE INTO auto_flood_actions VALUES(?,?,?,?,?)",
+            (int(chat_id), int(message_id), int(user_id), mode, now)).rowcount)
+        self.db.execute("DELETE FROM auto_flood_actions WHERE created_at<?", (now-30*86400,))
+        self.db.execute("DELETE FROM auto_flood_actions WHERE chat_id=? AND message_id NOT IN "
+            "(SELECT message_id FROM auto_flood_actions WHERE chat_id=? ORDER BY message_id DESC LIMIT 10000)",
+            (int(chat_id), int(chat_id)))
+        return claimed
+
+    def audit_penalty(self, chat_id, message_id, user_id, mode, result):
+        self.db.execute("UPDATE moderation_audit SET penalty=?,penalty_result=? "
+                        "WHERE chat_id=? AND message_id=? AND target_id=? AND source='text' AND outcome='deleted'",
+                        (mode, result[:160], int(chat_id), int(message_id), int(user_id)))
+
     def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None, *, rule_key="", pack_id="", match_kind=""):
         """Bounded metadata only. Observation never enters punitive strike history."""
-        if outcome not in ("observed", "deleted", "failed") or source not in ("text", "ocr", "channel"):
+        if outcome not in ("observed", "deleted", "cleared", "failed") or source not in ("text", "ocr", "channel"):
             raise ValueError("未知审核状态")
         when = int(time.time() if now is None else now)
+        # A confirmed single deletion may upgrade a bulk submission, while
+        # observations/retries must never erase successful cleanup evidence.
+        keep = "moderation_audit.outcome='deleted' OR (moderation_audit.outcome='cleared' AND excluded.outcome!='deleted')"
         self.db.execute(
             "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at,rule_key,pack_id,match_kind) "
             "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
-            "reason=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reason ELSE excluded.reason END,"
-            "outcome=CASE WHEN moderation_audit.outcome='deleted' THEN 'deleted' ELSE excluded.outcome END,"
-            "reviewed_by=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reviewed_by ELSE NULL END,"
-            "rule_key=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.rule_key ELSE excluded.rule_key END,"
-            "pack_id=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.pack_id ELSE excluded.pack_id END,"
-            "match_kind=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.match_kind ELSE excluded.match_kind END,"
-            "created_at=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.created_at ELSE excluded.created_at END",
+            f"reason=CASE WHEN {keep} THEN moderation_audit.reason ELSE excluded.reason END,"
+            f"outcome=CASE WHEN {keep} THEN moderation_audit.outcome ELSE excluded.outcome END,"
+            f"reviewed_by=CASE WHEN {keep} THEN moderation_audit.reviewed_by ELSE NULL END,"
+            f"rule_key=CASE WHEN {keep} THEN moderation_audit.rule_key ELSE excluded.rule_key END,"
+            f"pack_id=CASE WHEN {keep} THEN moderation_audit.pack_id ELSE excluded.pack_id END,"
+            f"match_kind=CASE WHEN {keep} THEN moderation_audit.match_kind ELSE excluded.match_kind END,"
+            f"created_at=CASE WHEN {keep} THEN moderation_audit.created_at ELSE excluded.created_at END",
             (int(chat_id), int(message_id), int(target_id), str(reason)[:100], source, outcome, when,
              str(rule_key or "")[:80], str(pack_id)[:40], str(match_kind)[:80]))
         self.db.execute("DELETE FROM moderation_audit WHERE created_at<?", (when - 30*86400,))

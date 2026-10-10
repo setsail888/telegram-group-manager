@@ -12,9 +12,12 @@ from .reply_rules import parse_keywords, parse_buttons, media_from_reply
 from .scheduler import parse_rule, next_occurrence, format_run
 from .word_library import parse_import, IMPORT_BYTES, describe_hit
 from .membership import is_current_member
+from .flood_penalty import PENALTIES
 
 
 FORMS = {
+    "flood_mute_time": ("floodpenalty", (("minutes", "发送禁言分钟数，整数1–525600（365天）；预览确认后只影响今后的处罚。"),)),
+    "flood_ban_time": ("floodpenalty", (("minutes", "发送封禁分钟数，整数1–525600；0表示永久。预览确认后只影响今后的处罚。"),)),
     "word_import": ("words", (("content", "发送UTF-8词库文件（单次最多1 MiB）或粘贴文字。每行一词；支持 匹配方式+Tab+词 或JSONL。总条数不限，可分批追加。已有词保持原规则。"),)),
     "pack_exclude": ("wordpacks", (("text", "发送要从内置词库排除的完整词条（2–80字）；不会豁免同名自定义规则。"),)),
     "pack_restore": ("wordpacks", (("text", "发送要恢复的完整内置词条（2–80字）。"),)),
@@ -204,6 +207,9 @@ class AdminUI:
             elif op == "word_import":
                 values["revision"] = self.bot.store.word_revision(cid)
                 self.bot.word_ui.preview_import(uid, draft)
+            elif op in ("flood_mute_time", "flood_ban_time"):
+                setting = "flood_ban_minutes" if op == "flood_ban_time" else "flood_mute_minutes"
+                self.bot.flood_ui.preview(uid, cid, {setting: value}, draft=draft)
             elif op in ("pack_exclude", "pack_restore"):
                 values["revision"] = self.bot.store.word_revision(cid)
                 self._preview(uid, draft, ("排除内置词：" if op == "pack_exclude" else "恢复内置词：") + value)
@@ -241,6 +247,14 @@ class AdminUI:
         return True
 
     def _validate(self, op, key, text, message, values):
+        if op in ("flood_mute_time", "flood_ban_time"):
+            try:
+                value = int(text)
+            except ValueError:
+                raise ValueError("请发送整数分钟数。") from None
+            if (0 if op == "flood_ban_time" else 1) <= value <= 525600:
+                return value
+            raise ValueError("时长范围为1–525600分钟；只有封禁支持0表示永久。")
         if op == "word_import":
             if sum(d["op"] == "word_import" and "content" in d["values"] for d in self.drafts.values()) >= 4:
                 raise ValueError("并发词库导入预览已满，请稍后重试。")
@@ -425,7 +439,7 @@ class AdminUI:
             index = max(0,min(int(index),pages-1))
             rows = rows[index*8:index*8+8]
         lines = []
-        outcomes = {"observed": "观察", "deleted": "已删", "failed": "删除失败"}
+        outcomes = {"observed": "观察", "deleted": "已删", "cleared": "批量清理已提交", "failed": "删除失败"}
         for n, row in enumerate(rows):
             if page == "audit":
                 stamp = datetime.fromtimestamp(row['created_at'],store.tz).strftime("%m-%d %H:%M")
@@ -434,6 +448,8 @@ class AdminUI:
                     lines.append(f"  规则：{row['rule_key']}" + (f" · 分类：{row['pack_id']}" if row.get("pack_id") else " · 自定义"))
                 if row.get("match_kind"):
                     lines.append("  识别："+row["match_kind"])
+                if row.get("penalty"):
+                    lines.append("  处罚："+PENALTIES.get(row["penalty"], row["penalty"])+" · "+row["penalty_result"])
                 buttons = [b(f"✓ 复核 #{row['id']}", f"ad:{cid}:review:{row['id']}")]
                 if str(cid).startswith("-100"):
                     buttons.append({"text": "查看原消息", "url": f"https://t.me/c/{str(cid)[4:]}/{row['message_id']}"})
@@ -491,10 +507,14 @@ class AdminUI:
                 if arg not in FORMS:
                     raise ValueError("未知操作。")
                 draft = self._draft(uid, cid, arg, FORMS[arg][0])
+                if arg in ("flood_mute_time", "flood_ban_time"):
+                    draft["values"]["expected"] = bot.flood_ui.snapshot(cid)
                 bot.answer(qid)
                 return self._prompt(uid, draft)
             if action in ("pack", "packmode", "packpreset", "packpage", "pexclude", "wordexport", "variantmode", "variantpreset"):
                 return bot.word_ui.callback(uid, cid, action, arg, mid, qid)
+            if action in ("fpenalty", "crossmode", "fmutetime", "fbantime"):
+                return bot.flood_ui.callback(uid, cid, action, arg, mid, qid)
             if action == "word":
                 self.word_choice(uid, cid, arg)
                 bot.answer(qid)
@@ -577,6 +597,8 @@ class AdminUI:
     def commit(self, uid, draft):
         bot, store, cid = self.bot, self.bot.store, draft["cid"]
         op, v = draft["op"], draft["values"]
+        if op == "flood_config":
+            return bot.flood_ui.commit(draft)
         if op.startswith("library_") or op in ("word_import", "pack_exclude", "pack_restore"):
             return bot.word_ui.commit(uid, draft)
         if op in ("word_mode", "word_delete"):
