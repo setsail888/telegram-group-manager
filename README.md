@@ -4,6 +4,8 @@
 
 ## 🚀 云服务器一键部署（Debian / Ubuntu）
 
+**管理按钮点击反应慢？** 已减少同一次按钮点击里的重复管理员权限请求，并提供不暴露 Token 的耗时日志和服务器测速方法，详见 [管理按钮延迟排查](docs/slow-buttons.md)。
+
 不需要域名、SSL、网页服务器或开放端口。**GitHub 仓库已公开**：全新 Linux 云服务器无需注册或登录 GitHub，可自动安装缺失的 curl、Git 和 Docker Compose，隐藏输入 Bot Token 后构建/启动容器，并通过中文菜单进行更新、备份、启停、OCR 和网页看板管理。
 
 在服务器 SSH 终端**直接粘贴下面整段命令**（不要在 Windows PowerShell 本地执行）：

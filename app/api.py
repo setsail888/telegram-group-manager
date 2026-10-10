@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+import time
 import urllib.error
 import urllib.request
 
@@ -26,7 +27,12 @@ class TelegramAPI:
         request = urllib.request.Request(
             self._url + method, data=data,
             headers={"Content-Type": "application/json"}, method="POST")
-        timeout = max(35, int(params.get("timeout", 0)) + 10)
+        # Long polling legitimately waits for updates. Interactive methods
+        # should not stall the entire single-threaded bot for 35 seconds on
+        # a degraded connection.
+        timeout = (max(35, int(params.get("timeout", 0)) + 10)
+                   if method == "getUpdates" else 15)
+        started_at = time.monotonic()
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 result = json.load(response)
@@ -40,6 +46,14 @@ class TelegramAPI:
             raise TelegramAPIError(method, "网络连接中断") from None
         except (ValueError, UnicodeDecodeError):
             raise TelegramAPIError(method, "服务端返回了无效 JSON") from None
+        finally:
+            elapsed = time.monotonic() - started_at
+            # Never print the URL, raw params, response, bot token or IDs.
+            # Polling delays are expected, so only measure individual
+            # interactive/API requests here.
+            if method != "getUpdates" and elapsed >= 2.5:
+                LOG.warning("Telegram API 响应较慢: %s 耗时 %.2f 秒",
+                            method, elapsed)
         if not isinstance(result, dict) or result.get("ok") is not True:
             info = result if isinstance(result, dict) else {}
             description = str(info.get("description", "API 拒绝了请求"))
@@ -54,6 +68,12 @@ class TelegramAPI:
         try:
             return self.call(method, **params)
         except TelegramAPIError as exc:
+            # Telegram returns 400 for editing an already identical page.
+            # This is not a failure, and must not trigger sendMessage fallback
+            # which would create duplicate menu messages and extra latency.
+            if (method == "editMessageText"
+                    and "message is not modified" in str(exc).lower()):
+                return True
             LOG.warning("Telegram %s 未成功: %s", method, exc)
             return None
 
