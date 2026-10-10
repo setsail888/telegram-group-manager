@@ -6,7 +6,6 @@ import random
 import re
 import secrets
 import time
-from collections import defaultdict
 
 from .api import TelegramAPIError
 from .economy import Economy
@@ -63,7 +62,7 @@ PAGE_SWITCHES = {
     "points": (("🪙 签到积分", "points_enabled"),),
 }
 PAGE_NUMBERS = {
-    "spam": (("mention_limit", "批量@人数", 1),
+    "spam": (("mention_limit", "批量提及次数", 1),
              ("auto_mute_after", "连续违规次数", 1),
              ("auto_mute_minutes", "自动禁言分钟", 5)),
     "flood": (("flood_limit", "短时消息条数", 1),
@@ -106,7 +105,7 @@ class GroupBot:
             ("true", "yes", "on", "1"))
         self._ocr_invalidated = {}
         self._admins = {}  # chat_id -> (expiration, frozenset of ids)
-        self._reply_time = defaultdict(float)
+        self._reply_time = {}
         self._public_command_time = {}
         self._word_wizards = {}  # user_id -> (chat_id, operation, expiry)
         # Rate-limit ALL public moderation reminders per group across modules.
@@ -316,6 +315,8 @@ class GroupBot:
                 f"违规自动禁言：{'开' if conf['auto_mute_enabled'] else '关'}\n"
                 f"累计 {conf['auto_mute_after']} 次实际删除 / 10 分钟 → "
                 f"禁言 {conf['auto_mute_minutes']} 分钟\n"
+                "检测文字及媒体说明中的显式@和隐藏提及；伪装链接同样遵守域名白名单。\n"
+                "采用规则识别，可能漏判或误判，请先在测试群调整。\n"
                 "注：自动禁言默认关闭，启用前请确认机器人限制成员权限。"
             )
         elif what == "flood":
@@ -1400,7 +1401,8 @@ class GroupBot:
             if any(word in normalized for word in keywords):
                 key = (chat_id, user_id, row["key"])
                 now = time.monotonic()
-                if now - self._reply_time[key] < 60:
+                previous = self._reply_time.get(key)
+                if previous is not None and now - previous < 60:
                     continue
                 self._reply_time[key] = now
                 if len(self._reply_time) > 20000:
@@ -1545,11 +1547,15 @@ class GroupBot:
                                   message_id=previous["message_id"])
                 self.store.del_pending(chat_id, left)
             return
+        # Public member commands are messages too: inspect them before any
+        # command can reply, create an order, or bypass the flood counters.
+        allowed = self._moderate(message, is_edit="edited_message" in update)
+        if allowed is False:
+            return
         if "edited_message" not in update:
             from .commands import handle_command
             if handle_command(self, message):
                 return
-        allowed = self._moderate(message, is_edit="edited_message" in update)
         if "edited_message" not in update and allowed is not False:
             self._maybe_queue_ocr(message)
         if "edited_message" not in update and allowed is not False:
