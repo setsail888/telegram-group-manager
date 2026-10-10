@@ -221,7 +221,7 @@ fi
         self.assertNotIn("docker compose start groupbot", calls)
         self.assertEqual(len(list((self.base / "backups").glob("*.sqlite3"))), 1)
 
-    def test_update_backs_up_before_private_git_pull(self):
+    def test_update_backs_up_before_public_git_pull(self):
         self.provision_env()
         (self.project / ".git").mkdir()
         script = """
@@ -300,26 +300,25 @@ update
         self.assertIn("docker compose cp", calls)
         self.assertNotIn("UNEXPECTED_PULL", calls)
 
-    def test_readme_one_command_private_repo_bootstrap_offline(self):
-        # Exact command displayed to users; all GitHub and Docker actions mocked.
+    def test_readme_one_command_public_repo_bootstrap_offline(self):
+        # Exact command displayed to users; public curl/git and Docker mocked.
         self.env["GROUPGUARD_MOCK_SOURCE"] = str(self.project)
         self.env["GROUPGUARD_MOCK_TOKEN"] = self.token
-        self.fake_bin("gh", """#!/usr/bin/env bash
+        self.fake_bin("curl", """#!/usr/bin/env bash
 set -eu
-printf 'gh %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
-if [[ "$1" == "auth" ]]; then
-  exit 0
-elif [[ "$1" == "api" ]]; then
-  cat "$GROUPGUARD_MOCK_SOURCE/scripts/server-bootstrap.sh"
-elif [[ "$1" == "repo" && "$2" == "clone" ]]; then
-  dest="${@: -1}"
-  mkdir -p "$dest"
-  cp -R "$GROUPGUARD_MOCK_SOURCE"/. "$dest/"
-  printf 'BOT_TOKEN=%s\\n' "$GROUPGUARD_MOCK_TOKEN" > "$dest/.env"
-  chmod 600 "$dest/.env"
-else
-  exit 3
-fi
+printf 'curl %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+[[ "$*" == *"raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh"* ]] || exit 3
+cat "$GROUPGUARD_MOCK_SOURCE/scripts/server-bootstrap.sh"
+""")
+        self.fake_bin("git", """#!/usr/bin/env bash
+set -eu
+printf 'git %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+[[ "$1" == "clone" ]] || exit 3
+dest="${@: -1}"
+mkdir -p "$dest"
+cp -R "$GROUPGUARD_MOCK_SOURCE"/. "$dest/"
+printf 'BOT_TOKEN=%s\\n' "$GROUPGUARD_MOCK_TOKEN" > "$dest/.env"
+chmod 600 "$dest/.env"
 """)
         command = next(
             line for line in (PROJECT / "README.md").read_text().splitlines()
@@ -329,10 +328,78 @@ fi
             text=True, capture_output=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
         actions = self.log.read_text()
-        self.assertIn("gh api -H Accept: application/vnd.github.raw+json", actions)
-        self.assertIn("gh repo clone slobys/telegram-group-manager", actions)
+        self.assertIn("curl -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager", actions)
+        self.assertIn("git clone --depth 1 --branch main https://github.com/slobys/telegram-group-manager.git", actions)
         self.assertIn("docker compose up -d --build groupbot", actions)
+        self.assertNotIn("gh auth", actions)
         self.assertTrue((self.base / "home/groupguard/.env").exists())
+        self.assertNotIn(self.token, result.stdout + result.stderr)
+
+    def test_public_and_docs_commands_are_identical(self):
+        readme = next(
+            line for line in (PROJECT / "README.md").read_text().splitlines()
+            if line.startswith("bash -c 'set -euo pipefail;"))
+        docs = next(
+            line for line in (PROJECT / "docs/server-one-click.md").read_text().splitlines()
+            if line.startswith("bash -c 'set -euo pipefail;"))
+        self.assertEqual(readme, docs)
+        self.assertNotIn("gh auth", readme)
+        self.assertIn("raw.githubusercontent.com/slobys/telegram-group-manager", readme)
+
+    def test_public_one_command_bootstraps_without_curl_or_git(self):
+        """Simulate a fresh Debian SSH server with no curl/git in PATH."""
+        self.env["GROUPGUARD_MOCK_SOURCE"] = str(self.project)
+        self.env["GROUPGUARD_MOCK_TOKEN"] = self.token
+        self.env["GROUPGUARD_MOCK_BIN"] = str(self.base / "bin")
+        self.env["PATH"] = str(self.base / "bin")
+        # Provide only the other core utilities, deliberately NOT curl or git.
+        for name in ("bash", "uname", "dirname", "pwd", "cat", "cp",
+                     "chmod", "mkdir", "grep", "id"):
+            target = shutil.which(name)
+            self.assertIsNotNone(target)
+            (self.base / "bin" / name).symlink_to(target)
+        self.fake_bin("apt-get", """#!/usr/bin/env bash
+set -eu
+printf 'apt-get %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+[[ "$1" == "install" ]] || exit 0
+if [[ "$*" == *"curl"* ]]; then
+  cat > "$GROUPGUARD_MOCK_BIN/curl" <<'MOCK_CURL'
+#!/usr/bin/env bash
+set -eu
+printf 'curl %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+cat "$GROUPGUARD_MOCK_SOURCE/scripts/server-bootstrap.sh"
+MOCK_CURL
+  chmod +x "$GROUPGUARD_MOCK_BIN/curl"
+fi
+if [[ "$*" == *"git"* ]]; then
+  cat > "$GROUPGUARD_MOCK_BIN/git" <<'MOCK_GIT'
+#!/usr/bin/env bash
+set -eu
+printf 'git %s\\n' "$*" >> "$GROUPGUARD_MOCK_LOG"
+[[ "$1" == "clone" ]] || exit 3
+dest="${@: -1}"
+mkdir -p "$dest"
+cp -R "$GROUPGUARD_MOCK_SOURCE"/. "$dest/"
+printf 'BOT_TOKEN=%s\\n' "$GROUPGUARD_MOCK_TOKEN" > "$dest/.env"
+chmod 600 "$dest/.env"
+MOCK_GIT
+  chmod +x "$GROUPGUARD_MOCK_BIN/git"
+fi
+""")
+        command = next(
+            line for line in (PROJECT / "README.md").read_text().splitlines()
+            if line.startswith("bash -c 'set -euo pipefail;"))
+        result = subprocess.run(
+            [str(self.base / "bin/bash"), "-c", command],
+            cwd=self.project, env=self.env, text=True,
+            capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.log.read_text()
+        self.assertIn("apt-get install -y curl ca-certificates", calls)
+        self.assertIn("apt-get install -y git ca-certificates", calls)
+        self.assertIn("git clone --depth 1 --branch main https://github.com/slobys/telegram-group-manager.git", calls)
+        self.assertIn("docker compose up -d --build groupbot", calls)
+        self.assertNotIn("gh auth", calls)
         self.assertNotIn(self.token, result.stdout + result.stderr)
 
 

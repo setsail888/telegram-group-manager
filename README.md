@@ -4,15 +4,15 @@
 
 ## 🚀 云服务器一键部署（Debian / Ubuntu）
 
-不需要域名、SSL、网页服务器或开放端口。支持全新 Linux 云服务器通过 **GitHub 私有仓库认证、自动安装 Docker Compose、隐藏输入 Bot Token、构建/启动容器**，还有中文菜单进行更新、备份、启停、OCR 和网页看板管理。
+不需要域名、SSL、网页服务器或开放端口。**GitHub 仓库已公开**：全新 Linux 云服务器无需注册或登录 GitHub，可自动安装缺失的 curl、Git 和 Docker Compose，隐藏输入 Bot Token 后构建/启动容器，并通过中文菜单进行更新、备份、启停、OCR 和网页看板管理。
 
 在服务器 SSH 终端**直接粘贴下面整段命令**（不要在 Windows PowerShell 本地执行）：
 
 ~~~bash
-bash -c 'set -euo pipefail; if ! command -v gh >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then if [ "$(id -u)" -eq 0 ]; then apt-get update && apt-get install -y gh git; else sudo apt-get update && sudo apt-get install -y gh git; fi; fi; gh auth status >/dev/null 2>&1 || gh auth login --hostname github.com --git-protocol https --web; gh api -H "Accept: application/vnd.github.raw+json" repos/slobys/telegram-group-manager/contents/scripts/server-bootstrap.sh | bash'
+bash -c 'set -euo pipefail; command -v curl >/dev/null 2>&1 || { if [ "$(id -u)" -eq 0 ]; then apt-get update && apt-get install -y curl ca-certificates; else sudo apt-get update && sudo apt-get install -y curl ca-certificates; fi; }; curl -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh | bash'
 ~~~
 
-**私有仓库的限制**：第一次运行必须在 GitHub 浏览器完成一次授权，脚本不能也不会绕过私有权限。SSH 下按提示打开 GitHub 设备授权链接、输入临时验证码即可；无需把 GitHub Token 发给任何人。之后安装器会让你粘贴 BotFather Token，且不会在终端显示。**请使用独立、可信的云服务器，避免让别人取得其 SSH 与 Docker 管理权限。**
+**无需 GitHub 登录或授权码。** 上面的命令从公开仓库下载引导脚本，并克隆项目；首次仍需自己提供 Telegram BotFather Token，输入时不会显示在终端。建议先查看 [公开的启动脚本](scripts/server-bootstrap.sh) 再执行网络脚本。**请使用独立、可信的云服务器，保护 SSH 与 Docker 管理权限。**
 
 成功后，在 SSH 中随时调出中文菜单：
 
@@ -22,7 +22,7 @@ bash ~/groupguard/scripts/server-manager.sh
 
 安装目录默认为 **~/groupguard**；数据库在 Docker 命名卷；备份默认在 **~/groupguard-backups**。**卸载默认保留数据，删除积分数据库必须再输入完整二次确认口令。**
 
-完整安装说明、首次授权、BotFather 设置、日志排障和手动克隆方式见 [服务器一键部署指南](docs/server-one-click.md)。仓库保持 Private，不能直接用公开的 raw.githubusercontent.com/curl 命令下载私有脚本。
+完整安装说明、BotFather 设置、日志排障和手动克隆方式见 [服务器一键部署指南](docs/server-one-click.md)。公开仓库的源代码不包含你服务器里的真实 .env、Bot Token 和数据库；**仍然不要把密钥上传到 GitHub**。
 
 ## 已实现的功能
 
@@ -55,11 +55,10 @@ bash ~/groupguard/scripts/server-manager.sh
 
 GitHub 项目地址：https://github.com/slobys/telegram-group-manager
 
-**新服务器**（已安装 Docker + Docker Compose v2、具备本私有仓库访问权限）：
+**新服务器**（已经安装 Git、Docker + Docker Compose v2，也可以手动克隆）：
 
 ~~~bash
-gh auth login
-gh repo clone slobys/telegram-group-manager
+git clone https://github.com/slobys/telegram-group-manager.git
 cd telegram-group-manager
 cp config.sample .env
 chmod 600 .env

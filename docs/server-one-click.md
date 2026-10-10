@@ -1,14 +1,14 @@
 # GroupGuard｜云服务器一键部署详细教程
 
-适用于 **Debian 12/13、Ubuntu 22.04/24.04 等由 Docker 官方 apt 软件源支持的版本**，支持 amd64 和 arm64。项目源码位于 GitHub 私有仓库 **slobys/telegram-group-manager**。
+适用于 **Debian 12/13、Ubuntu 22.04/24.04 等由 Docker 官方 apt 软件源支持的版本**，支持 amd64 和 arm64。项目源码位于 GitHub **公开仓库** [slobys/telegram-group-manager](https://github.com/slobys/telegram-group-manager)。
 
-> 重要：仓库仍是 Private。首次需要通过 GitHub 账号授权，不能使用公开 raw 链接匿名下载。安装过程中主要有一次 GitHub 授权和一次 BotFather Token 输入。
+> 重要：仓库已公开，**无需安装 GitHub CLI，也无需登录 GitHub 账号**。部署过程中只需准备 Telegram BotFather Token，安装器将使用本地隐藏输入，并保存到权限为 600 的 .env。
 
 ## 一、准备工作
 
 - 一台能访问 GitHub、Docker Hub 和 Telegram API 的 Linux 云服务器，带 SSH 登录及 root 或 sudo 权限。
 - 推荐普通版 **1 vCPU、512 MB 可用内存、1 GB 可用硬盘**；OCR 版建议 **2 vCPU、2 GB 内存**，构建镜像还需额外临时空间。
-- 私有仓库的 GitHub 读取权限（目前仓库所有者为 slobys）。
+- 无需 GitHub 账号，但服务器必须能够通过 HTTPS 访问 github.com、raw.githubusercontent.com。
 - 一枚通过 Telegram 官方 @BotFather 创建的 Bot Token。
 
 **仅需开放 SSH 管理端口**（通常为 22，具体依服务器配置）。不要为机器人额外开放 80、443 或 8765；Telegram 长轮询不需要入站端口。
@@ -32,37 +32,35 @@ ssh ubuntu@你的服务器IP
 ## 三、一键安装：复制一条命令
 
 ~~~bash
-bash -c 'set -euo pipefail; if ! command -v gh >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then if [ "$(id -u)" -eq 0 ]; then apt-get update && apt-get install -y gh git; else sudo apt-get update && sudo apt-get install -y gh git; fi; fi; gh auth status >/dev/null 2>&1 || gh auth login --hostname github.com --git-protocol https --web; gh api -H "Accept: application/vnd.github.raw+json" repos/slobys/telegram-group-manager/contents/scripts/server-bootstrap.sh | bash'
+bash -c 'set -euo pipefail; command -v curl >/dev/null 2>&1 || { if [ "$(id -u)" -eq 0 ]; then apt-get update && apt-get install -y curl ca-certificates; else sudo apt-get update && sudo apt-get install -y curl ca-certificates; fi; }; curl -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh | bash'
 ~~~
 
 安装器依次完成：
 
-1. 检查/安装 Git 和 GitHub CLI（gh）。
-2. 若尚未 GitHub 登录，在终端显示授权说明。按提示打开 GitHub 设备授权页面，输入一次性验证码，允许本机读取私有仓库。**不要在聊天中提交 GitHub Token 或授权码**。
-3. 通过 GitHub API **已认证地**获取启动脚本，并克隆项目到当前 SSH 用户的 **~/groupguard**。
+1. 如果缺少 curl，会自动通过 apt 安装 curl 和证书；启动脚本还会检测并安装缺失的 Git。
+2. 直接从公开 GitHub 仓库下载启动脚本，无需 GitHub 登录或授权码。
+3. 使用 git clone 克隆项目到当前 SSH 用户的 **~/groupguard**（已有同名安装时检查远程地址，不会覆盖其他项目）。
 4. 若没有 Docker，按 Docker 官方 apt 仓库流程安装 Docker Engine、Buildx、Compose V2；若已有 Docker 和 Compose V2，则保留现有环境。已有 Docker 但缺少 Compose V2 时**不会替换或卸载原有 Docker**。
 5. 首次生成权限为 600 的 ~/groupguard/.env，隐藏输入 BotFather Token 并检查格式。
 6. 校验 Compose 配置，构建容器，启动 groupbot 并显示运行状态。
 
 默认是**轻量普通版**：不会安装 OCR、不启动网页看板，也不会自动改防火墙和其他 Docker 服务。
 
-### GitHub 授权失败怎么办？
+### GitHub 访问失败怎么办？
 
-单独执行：
+不需要 GitHub 授权。确认服务器能够访问 GitHub 和公开安装脚本：
 
 ~~~bash
-gh auth login --hostname github.com --git-protocol https --web
-gh auth status
-gh repo view slobys/telegram-group-manager
+curl -I https://raw.githubusercontent.com/slobys/telegram-group-manager/main/scripts/server-bootstrap.sh
+git ls-remote https://github.com/slobys/telegram-group-manager.git HEAD
 ~~~
 
-最后一行应该能读取私有仓库，否则当前 GitHub 账号没有对应权限。GitHub CLI 可能在服务器当前账号目录下保存授权凭据，请保护好 SSH 登录和服务器系统权限。如果不希望服务器保存完整账号授权，可使用仅有该仓库读取权限的 SSH deploy key，手动克隆后使用安装脚本。
+如果无法访问，检查服务器的 DNS、HTTPS 出站连接、防火墙和代理，或稍后重试。也可以先下载并人工检查脚本内容，再执行；不要在不信任的服务器上运行远程脚本。
 
 ### 不想运行在线引导脚本？可手动克隆后运行
 
 ~~~bash
-gh auth login
-gh repo clone slobys/telegram-group-manager ~/groupguard
+git clone https://github.com/slobys/telegram-group-manager.git ~/groupguard
 cd ~/groupguard
 bash install.sh
 ~~~
@@ -148,7 +146,7 @@ ssh -N -L 8765:127.0.0.1:8765 ubuntu@你的服务器IP
 bash ~/groupguard/scripts/server-manager.sh update
 ~~~
 
-安装器会先暂停机器人、将 SQLite 数据库导出到 **~/groupguard-backups**，成功后重新启动原容器，再以 fast-forward 方式拉取 GitHub main 最新代码，重新构建并启动。
+安装器会先暂停机器人、将 SQLite 数据库导出到 **~/groupguard-backups**，成功后重新启动原容器，再以 fast-forward 方式拉取公开 GitHub 仓库 main 分支的最新代码，重新构建并启动。**更新同样无需 GitHub 登录。**
 
 备份目录默认权限为 700，备份文件权限为 600，放在仓库目录之外。升级保留本地 .env、Docker 命名卷、积分、订单和群设置；如果源码有本地改动，会停止更新，**不会强制覆盖**。如果自动备份失败，则**不会继续升级**。
 
@@ -167,13 +165,13 @@ bash ~/groupguard/scripts/server-manager.sh backup
 - 选择 **1**：删除 GroupGuard 容器，**保留** Docker 命名卷、源码、.env 和备份。
 - 选择 **2**：危险操作。必须再手动输入完整确认短语 DELETE GROUPGUARD DATA，才删除该项目 Docker 命名卷。
 
-卸载**不会**卸载服务器 Docker Engine、Git、GitHub CLI 或清理其他 Docker 项目。
+卸载**不会**卸载服务器 Docker Engine、Git、curl 或清理其他 Docker 项目。
 
 ## 十、故障检查
 
 | 症状 | 可能原因与排查 |
 |---|---|
-| GitHub 403/404 | 仓库为 Private，当前 SSH 账号的 gh 授权不足或不是仓库所有者 |
+| GitHub 下载失败 | 检查公开仓库 URL、DNS、HTTPS 出站连接，以及服务器能否访问 github.com 与 raw.githubusercontent.com |
 | Token 验证失败 | Token 格式不对；重新运行菜单 5 输入，输入时内容不会显示 |
 | Docker 构建失败 | 服务器无法访问 Docker Hub、磁盘空间不足或 Docker 官方 apt 仓库暂不可用 |
 | Telegram getMe 失败 | 服务器出口无法访问 api.telegram.org 或 Bot Token 错误 |
@@ -185,4 +183,4 @@ bash ~/groupguard/scripts/server-manager.sh backup
 
 ## 安全原则
 
-安装器不做以下操作：不要求公开 SSH 密钥、不上传 Bot Token、不打开新的公网端口、不自动删除其他容器、不覆盖其他 Git 仓库、不关闭已有防火墙；不进行自动提现、现实商品支付或收费抽奖。GitHub 私有授权只是代码读取权限，不赋予别人操作你的机器人的权限。
+安装器不做以下操作：不要求公开 SSH 密钥、不上传 Bot Token、不打开新的公网端口、不自动删除其他容器、不覆盖其他 Git 仓库、不关闭已有防火墙；不进行自动提现、现实商品支付或收费抽奖。公开源码不意味着任何人能够取得你服务器中的 Token 或数据库，但服务器 SSH 权限与配置仍须妥善保护。

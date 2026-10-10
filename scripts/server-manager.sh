@@ -291,9 +291,9 @@ update() {
   check_config
   info "更新前先执行数据库备份（已部署时）"
   backup || die "备份不成功，已取消更新；首次安装请改用 install"
-  info "拉取 GitHub 私有仓库最新 main 分支"
-  git -C "${APP_DIR}" pull --ff-only origin main ||
-    die "更新失败；请检查 GitHub 授权与网络"
+  info "拉取 GitHub 公开仓库最新 main 分支，无需账号登录"
+  GIT_TERMINAL_PROMPT=0 git -C "${APP_DIR}" pull --ff-only origin main ||
+    die "更新失败；请检查公开 GitHub 仓库的网络连接和本地源码状态"
   dc config -q
   dc up -d --build groupbot
   info "更新成功，当前 Git 提交：$(git -C "${APP_DIR}" rev-parse --short HEAD)"
@@ -401,7 +401,7 @@ GroupGuard 服务器一键管理
 
 重要：本项目不需要服务器域名、SSL 证书和任何对外开放端口。
 网页看板只绑定 127.0.0.1:8765，必须通过 SSH 隧道访问。
-代码仓库为私有仓库，首次克隆和自动更新需 GitHub 授权。
+代码仓库已公开；首次安装和自动更新均无需 GitHub 账号。
 默认不启用 OCR；默认不自动启动网页看板。
 HELP
 }
