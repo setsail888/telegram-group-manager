@@ -121,6 +121,102 @@ class FloodMenuTests(unittest.TestCase):
         self.bot.handle_update(self.cb("v:-1001:flood"))
         self.assertIn("媒体连发：✅ 开启", self.page()["text"])
 
+    def test_media_explanation_describes_actual_threshold_scope_and_consequences(self):
+        self.bot.handle_update(self.cb("v:-1001:floodmedia"))
+        initial = self.page()
+        text = initial["text"]
+        for phrase in (
+            "状态：⭕ 未生效（本项关，主防刷屏开）",
+            "同一普通成员在 20 秒内发送超过 5 条媒体",
+            "从第 6 条起触发清理",
+            "照片、视频、动图、贴纸、文件、语音、音频、视频留言",
+            "不同类型合计，内容不必相同",
+            "纯文字及编辑消息；管理员豁免",
+            "中间穿插文字也不会清空该时间窗口内的媒体计数",
+            "再发第 6 条贴纸时会删除该贴纸",
+            "之前的媒体不会追溯删除",
+            "处罚：删除触发消息",
+            "提醒：静默清理，不在群内发提示",
+            "主防刷屏和本项两个开关都要开启",
+            "机器人还需有删除消息权限",
+            "纯文字仍可能触发普通刷屏规则",
+        ):
+            self.assertIn(phrase, text)
+        self.assertLess(len(text), 520)
+        self.assertIn("t:-1001:media_flood_enabled:floodmedia",
+                      self.button_values())
+        self.assertIn("n:-1001:media_flood_limit:+1:floodmedia",
+                      self.button_values())
+        self.assertIn("⬅️ 返回防刷屏",
+                      [button["text"] for button in self.buttons()])
+
+    def test_media_explanation_follows_custom_settings_and_parent_master_switch(self):
+        self.store.set(-1001, "media_flood_limit", 8)
+        self.store.set(-1001, "media_flood_window", 35)
+        self.store.set(-1001, "media_flood_enabled", True)
+        self.store.set(-1001, "anti_flood", False)
+        self.bot.handle_update(self.cb("v:-1001:floodmedia"))
+        text = self.page()["text"]
+        self.assertIn("状态：⭕ 未生效（本项开，主防刷屏关）", text)
+        self.assertIn("35 秒内发送超过 8 条媒体", text)
+        self.assertIn("第 9 条", text)
+        self.assertNotIn("20 秒", text)
+        self.bot.handle_update(self.cb("fs:-1001:on"))
+        self.bot.handle_update(self.cb("v:-1001:floodmedia"))
+        self.assertIn("状态：✅ 生效中（本项开，主防刷屏开）",
+                      self.page()["text"])
+        self.store.set(-1001, "flood_penalty", "mute")
+        self.store.set(-1001, "flood_mute_minutes", 25)
+        self.store.set(-1001, "flood_notice_seconds", 10)
+        self.bot.handle_update(self.cb("v:-1001:floodmedia"))
+        text = self.page()["text"]
+        self.assertIn("处罚：删除并禁言 25 分钟", text)
+        self.assertIn("提醒：发送短提示，约 10 秒后撤回", text)
+
+    def test_media_explanation_shows_global_cumulative_mute_warning(self):
+        self.store.set(-1001, "auto_mute_enabled", True)
+        self.bot.handle_update(self.cb("v:-1001:floodmedia"))
+        self.assertIn("全局累计违规禁言", self.page()["text"])
+        self.store.set(-1001, "flood_penalty", "mute")
+        self.bot.handle_update(self.cb("v:-1001:floodmedia"))
+        self.assertNotIn("全局累计违规禁言", self.page()["text"])
+
+    def test_mixed_media_counts_with_interspersed_text_and_only_deletes_sixth_media(self):
+        self.store.set(-1001, "media_flood_enabled", True)
+        self.store.set(-1001, "media_flood_limit", 5)
+        self.store.set(-1001, "media_flood_window", 20)
+        # Disable other flood triggers to isolate the media-specific rule.
+        self.store.set(-1001, "flood_limit", 30)
+        self.store.set(-1001, "repeat_limit", 10)
+        kinds = ["photo", "video", "document", "voice", "animation", "sticker"]
+        for index, kind in enumerate(kinds):
+            if index in (1, 3):
+                self.bot.handle_update(self.msg(
+                    f"普通文字穿插 {index}", mid=1500 + index))
+            self.bot.handle_update(self.msg(
+                f"媒体正文 {index}", mid=1600 + index, kind=kind))
+            expected_deleted = [] if index < 5 else [1605]
+            self.assertEqual(
+                [d["message_id"] for d in self.deletions()], expected_deleted)
+        self.assertEqual(self.restrictions(), [])
+        # Editing an existing media message does not add to the flood count.
+        edited = self.msg("编辑字幕内容", mid=1604, kind="video")["message"]
+        self.bot.handle_update({"edited_message": edited})
+        self.assertEqual([d["message_id"] for d in self.deletions()], [1605])
+
+    def test_media_limit_needs_both_switches_no_auto_deletion_when_off(self):
+        self.store.set(-1001, "flood_limit", 30)
+        self.store.set(-1001, "repeat_limit", 10)
+        for enabled_media, enabled_parent in ((False, True), (True, False)):
+            self.bot.flood.records.clear()
+            self.store.set(-1001, "media_flood_enabled", enabled_media)
+            self.store.set(-1001, "anti_flood", enabled_parent)
+            for index in range(7):
+                self.bot.handle_update(self.msg(
+                    f"不同媒体 {enabled_media}-{enabled_parent}-{index}",
+                    mid=1700 + index, kind="photo"))
+            self.assertEqual(self.deletions(), [])
+
     def test_flood_on_off_works_without_deleting_settings(self):
         self.store.set(-1001, "flood_limit", 3)
         self.store.set(-1001, "repeat_limit", 10)

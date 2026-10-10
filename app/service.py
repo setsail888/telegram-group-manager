@@ -348,18 +348,51 @@ class GroupBot:
                 "floodrepeat": "🔁 重复消息判断",
                 "floodmedia": "🖼️ 媒体连发限制",
             }
-            current = (
-                f"短时消息：{conf['flood_window']} 秒内超过 {conf['flood_limit']} 条"
-                if what in ("floodcount", "floodinterval")
-                else f"重复消息：{conf['repeat_window']} 秒内达到 {conf['repeat_limit']} 次"
-                if what == "floodrepeat"
-                else f"媒体连发：{'开' if conf['media_flood_enabled'] else '关'}，"
-                     f"{conf['media_flood_window']} 秒内超过 {conf['media_flood_limit']} 条"
-            )
-            text = (f"{labels[what]}\n\n{current}\n\n"
-                    "点击下方 ➖ / ➕ 调整，仅对当前群生效。"
-                    + ("\n需同时开启主防刷屏开关才生效。"
-                       if what == "floodmedia" else ""))
+            if what == "floodmedia":
+                seconds = conf["media_flood_window"]
+                limit = conf["media_flood_limit"]
+                enabled = conf["media_flood_enabled"] and conf["anti_flood"]
+                penalty = (
+                    "删除触发消息"
+                    if conf["flood_penalty"] == "delete"
+                    else f"删除并禁言 {conf['flood_mute_minutes']} 分钟"
+                )
+                notification = (
+                    "静默清理，不在群内发提示"
+                    if conf["flood_notice_seconds"] == 0
+                    else f"发送短提示，约 {conf['flood_notice_seconds']} 秒后撤回"
+                )
+                text = (
+                    "🖼️ 媒体连发限制\n\n"
+                    f"状态：{'✅ 生效中' if enabled else '⭕ 未生效'}"
+                    f"（本项{'开' if conf['media_flood_enabled'] else '关'}，"
+                    f"主防刷屏{'开' if conf['anti_flood'] else '关'}）\n"
+                    f"规则：同一普通成员在 {seconds} 秒内发送超过 {limit} 条媒体，"
+                    f"从第 {limit + 1} 条起触发清理。\n\n"
+                    "📌 计入：照片、视频、动图、贴纸、文件、语音、音频、视频留言；"
+                    "不同类型合计，内容不必相同。\n"
+                    "📌 不计入媒体次数：纯文字及编辑消息；管理员豁免。"
+                    "中间穿插文字也不会清空该时间窗口内的媒体计数。\n\n"
+                    f"例如：{seconds} 秒内已发 {limit} 条照片/视频，"
+                    f"再发第 {limit + 1} 条贴纸时会删除该贴纸，"
+                    "之前的媒体不会追溯删除。\n\n"
+                    f"处罚：{penalty}（在「防刷屏 → 惩罚」修改）。\n"
+                    f"提醒：{notification}。\n"
+                    "生效条件：主防刷屏和本项两个开关都要开启，"
+                    "机器人还需有删除消息权限。"
+                    "纯文字仍可能触发普通刷屏规则。\n"
+                    "点击下方 ➖ / ➕ 可调整条数和时间。"
+                )
+                if conf["auto_mute_enabled"] and conf["flood_penalty"] == "delete":
+                    text += "\n⚠️ 已开启全局累计违规禁言，累计达到阈值仍可能被禁言。"
+            else:
+                current = (
+                    f"短时消息：{conf['flood_window']} 秒内超过 {conf['flood_limit']} 条"
+                    if what in ("floodcount", "floodinterval")
+                    else f"重复消息：{conf['repeat_window']} 秒内达到 {conf['repeat_limit']} 次"
+                )
+                text = (f"{labels[what]}\n\n{current}\n\n"
+                        "点击下方 ➖ / ➕ 调整，仅对当前群生效。")
             keyboard.append([self._button("⬅️ 返回防刷屏", f"v:{chat_id}:flood")])
         elif what == "floodpenalty":
             text = (
