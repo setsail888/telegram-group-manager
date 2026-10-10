@@ -28,6 +28,7 @@ from .membership import is_current_member
 from .cross_flood import CrossAccountGuard, REASON as CROSS_REASON
 from .flood_penalty import penalty_label, apply_penalty
 from .flood_ui import FloodUI
+from .feature_help import FeatureHelp, ADMIN_PAGES
 
 LOG = logging.getLogger(__name__)
 GROUP_TYPES = {"group", "supergroup"}
@@ -154,6 +155,7 @@ class GroupBot:
         self.admin_ui = AdminUI(self)
         self.member_ui = MemberUI(self)
         self.language_ui = LanguageUI(self)
+        self.feature_help = FeatureHelp(self)
         self._reply_group_time = {}
         # Rate-limit ALL public moderation reminders per group across modules.
         self._last_moderation_notice = {}
@@ -344,6 +346,7 @@ class GroupBot:
             navigation.append(self._button(_ui('下一页 ▶️'), _ui('wl:{p0}:{p1}', p0=chat_id, p1=page + 1)))
         if navigation:
             keyboard.append(navigation)
+        self.feature_help.add_admin(keyboard, chat_id, "wordlist")
         keyboard.append([self._button(_ui('⬅️ 返回违禁词管理'), _ui('v:{p0}:words', p0=chat_id))])
         return self._edit_or_send(
             user_id, message_id,
@@ -579,6 +582,7 @@ class GroupBot:
         else:
             text = _ui('该功能暂不可用。')
         text, keyboard = self.admin_ui.decorate(chat_id, what, text, keyboard)
+        self.feature_help.add_admin(keyboard, chat_id, what)
         keyboard.append([self._button(_ui('⬅️ 返回设置'), _ui('g:{p0}', p0=chat_id))])
         return self._edit_or_send(
             user_id, message_id, text, keyboard)
@@ -628,6 +632,8 @@ class GroupBot:
                              _ui('sp:{p0}:{p1}', p0=chat_id, p1=task_id)),
                 self._button(_ui('🗑 删除'), _ui('sd:{p0}:{p1}', p0=chat_id, p1=task_id)),
             ])
+        if action != "sd":
+            self.feature_help.add_admin(keyboard, chat_id, "schedules")
         keyboard.append([self._button(_ui('⬅️ 返回公告列表'), _ui('v:{p0}:schedules', p0=chat_id))])
         return self._edit_or_send(user_id, message_id, text, keyboard)
 
@@ -810,7 +816,7 @@ class GroupBot:
         parts = data.split(":")
         if len(parts) not in (2, 3, 4, 5) or parts[0] not in (
             "g", "t", "v", "n", "w", "wl", "ws", "wp", "wn",
-            "fs", "fp", "fn",
+            "fs", "fp", "fn", "fh",
             "s", "sd", "sp", "sx", "ad", "ac"):
             self.answer(qid, _ui('未知或失效的按钮'))
             return
@@ -825,6 +831,13 @@ class GroupBot:
         if parts[0] in ("ad", "ac"):
             self._word_wizards.pop(user_id, None)
             return self.admin_ui.callback(query, chat_id, parts)
+        if parts[0] == "fh":
+            if len(parts) != 3 or parts[2] not in ADMIN_PAGES:
+                return self.answer(qid, _ui('未知功能说明，请重新打开功能页。'), alert=True)
+            self.admin_ui.cancel(user_id)
+            self._word_wizards.pop(user_id, None)
+            self.answer(qid)
+            return self.feature_help.admin(user_id, chat_id, parts[2], message.get("message_id"))
         self.admin_ui.cancel(user_id)
         if parts[0] != "w":
             self._word_wizards.pop(user_id, None)

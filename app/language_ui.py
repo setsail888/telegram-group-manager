@@ -12,6 +12,7 @@ class LanguageUI:
         current = bot.store.ui_language(owner)
         keyboard = [[bot._button(("✅ " if code == current else "")+name,
                     f"lang:set:{owner}:{code}")] for code, name in LOCALES.items()]
+        keyboard.append([bot._button(_ui("📖 功能说明"), f"lang:help:{owner}")])
         keyboard += [[bot._button(_ui("⬅️ 返回"), f"g:{cid}" if cid is not None else "groups")]]
         scope = _ui("本群系统提示") if cid is not None else _ui("我的私聊界面")
         return bot._edit_or_send(uid, mid, _ui("🌐 界面语言 / Language\n范围：{p0}\n当前：{p1}\n个人语言与群内语言分别保存。自定义欢迎语、群规、公告和关键词原文不会被翻译。",
@@ -28,7 +29,7 @@ class LanguageUI:
             if len(parts) == 2 and parts[1] == "self":
                 self.bot.answer(qid)
                 return self.page(uid, mid=message.get("message_id"))
-            if len(parts) == 3 and parts[1] == "group":
+            if len(parts) == 3 and parts[1] in ("group", "help"):
                 owner, locale = int(parts[2]), None
             elif len(parts) == 4 and parts[1] == "set":
                 owner, locale = int(parts[2]), parts[3]
@@ -39,6 +40,11 @@ class LanguageUI:
                     raise ValueError(_ui("没有权限管理这个群组。"))
             elif owner != uid:
                 raise ValueError(_ui("只能修改自己的私聊语言。"))
+            if parts[1] == "help":
+                self.bot.admin_ui.cancel(uid)
+                self.bot._word_wizards.pop(uid, None)
+                self.bot.answer(qid)
+                return self.bot.feature_help.language(uid, owner, message.get("message_id"))
             if locale is not None:
                 self.bot.store.set_ui_language(owner, locale)
                 if owner == uid:

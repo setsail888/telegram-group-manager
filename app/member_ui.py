@@ -3,6 +3,7 @@ from .i18n import error_text, msg as _ui, join_text
 import secrets
 import time
 from .membership import is_current_member
+from .feature_help import MEMBER_PAGES
 
 
 class MemberUI:
@@ -53,6 +54,11 @@ class MemberUI:
                 bot.answer(qid)
                 # Membership was checked above, don't add a second network RTT.
                 return self._home_checked(cid,uid,mid)
+            elif op=="help":
+                if arg not in MEMBER_PAGES:
+                    raise ValueError(_ui('未知功能说明，请重新打开功能页。'))
+                bot.answer(qid)
+                return bot.feature_help.member(uid,cid,arg,mid)
             elif op=="rules":
                 text = _ui('📖 群规\n')+store.content_text(cid, "rules_text")
             elif op=="id":
@@ -104,19 +110,23 @@ class MemberUI:
                 text = _ui('已取消兑换。')
             elif op in ("raffle","join"):
                 active = bot.raffles.active(cid)
-                if not active:
-                    raise ValueError(_ui('当前没有免费抽奖。'))
                 if op=="join":
+                    if not active:
+                        raise ValueError(_ui('当前没有免费抽奖。'))
                     if active["id"]!=int(arg):
                         raise ValueError(_ui('活动已变化，请重新查看。'))
                     joined = bot.raffles.join(cid, uid)
                     text = (_ui('✅ 报名成功') if joined["joined"] else _ui('已报名，无需重复报名')) + _ui(' · {p0}人参加', p0=joined['count'])
-                else:
+                elif active:
                     text = _ui('🎉 #{p0} {p1}\n免费报名，不消耗积分。', p0=active['id'], p1=active['title'])
                     kb = [[b(_ui('🙋 免费报名'),_ui('pc:{p0}:join:{p1}', p0=cid, p1=active['id']))]]
+                else:
+                    text = _ui('当前没有免费抽奖。')
             else:
                 raise ValueError(_ui('未知按钮。'))
             bot.answer(qid)
+            help_page = {"join": "raffle", "quote": "shop", "buy": "shop", "cancel": "shop"}.get(op, op)
+            bot.feature_help.add_member(kb,cid,help_page)
             result = bot._edit_or_send(uid,mid,text,kb+back)
             if op=="quote":
                 if isinstance(result,dict) and result.get("message_id"):
@@ -133,5 +143,6 @@ class MemberUI:
         ops = [(_ui('✅ 签到'),"checkin"),(_ui('🪙 积分'),"balance"),(_ui('🏆 排行'),"top"),(_ui('🎁 商城'),"shop"),
                (_ui('🧾 订单'),"orders"),(_ui('🎉 抽奖'),"raffle"),(_ui('📖 群规'),"rules"),(_ui('🆔 我的ID'),"id")]
         kb = [[b(label,_ui('pc:{p0}:{p1}:0', p0=cid, p1=op)) for label,op in ops[i:i+2]] for i in range(0,len(ops),2)]
+        self.bot.feature_help.add_member(kb,cid,"home")
         kb.append([b(_ui("🌐 界面语言 / Language"), "lang:self")])
         return self.bot._edit_or_send(uid,mid,_ui('👤 {p0} · 成员服务\n签到、兑换、免费报名均可点击操作。\n转账请在群里回复对方 /transfer 数量，并点击确认按钮。', p0=self.bot.store.chat(cid)['title']),kb)

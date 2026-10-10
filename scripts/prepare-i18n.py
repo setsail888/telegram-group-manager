@@ -12,7 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ("admin_ui", "commands", "economy_commands", "flood_ui", "member_ui", "points", "service",
          "word_ui", "economy", "store", "raffle", "scheduler", "reply_rules", "variants", "word_library",
-         "flood_penalty", "moderation", "language_ui", "command_menu", "cross_flood")
+         "flood_penalty", "moderation", "language_ui", "command_menu", "cross_flood", "feature_help")
 
 
 def chinese(value):

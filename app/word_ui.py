@@ -62,6 +62,7 @@ class WordUI:
             nav.append(b(_ui('下一页 ▶️'), _ui('ad:{p0}:packpage:{p1}_{p2}', p0=cid, p1=pack_id, p2=page + 1)))
         if nav:
             kb.append(nav)
+        self.bot.feature_help.add_admin(kb, cid, "wordpacks")
         return self.bot._edit_or_send(uid, mid, text, kb+admin.back(cid, "wordpacks"))
 
     def preview_import(self, uid, draft):
@@ -93,15 +94,19 @@ class WordUI:
             data, last, more, count = store.export_words(cid, cursor["after"])
             bot.answer(qid)
             if not count:
-                return bot.send(uid, _ui('当前没有可导出的自定义词条。'), reply_markup={"inline_keyboard": admin.back(cid, "words")})
+                kb = []
+                bot.feature_help.add_admin(kb, cid, "wordexport")
+                return bot.send(uid, _ui('当前没有可导出的自定义词条。'), reply_markup={"inline_keyboard": kb+admin.back(cid, "words")})
             sent = bot.api.safe("sendDocument", chat_id=uid, caption=_ui('自定义词库第{p0}部分，共{p1}条；不含内置分类、排除词及精确例外。', p0=cursor['part'], p1=count),
                 _files={"document": (_ui('groupguard{p0}-words-{p1}.jsonl', p0=cid, p1=cursor['part']), data, "application/x-ndjson")})
             if not sent:
                 raise ValueError(_ui('导出发送失败，请重试；词库未修改。'))
-            kb = admin.back(cid, "words")
+            kb = []
             if more:
                 token = admin._token(admin.exports, uid, cid, after=last, part=cursor["part"]+1, revision=cursor["revision"])
                 kb.insert(0, [bot._button(_ui('📤 下载下一部分'), _ui('ad:{p0}:wordexport:{p1}', p0=cid, p1=token))])
+            bot.feature_help.add_admin(kb, cid, "wordexport")
+            kb += admin.back(cid, "words")
             return bot.send(uid, _ui('✅ 已导出{p0}条。', p0=count) + (_ui('还有更多，请下载下一部分。') if more else _ui('已到末尾。')), reply_markup={"inline_keyboard": kb})
         values = {"revision": store.word_revision(cid)}
         if action in ("variantmode", "variantpreset"):

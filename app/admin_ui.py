@@ -93,8 +93,9 @@ class AdminUI:
         rule, b = self.word_choice(uid, cid, token), self.bot._button
         text = (_ui('📝 关键词：{p0}\n当前匹配：{p1}\n\n包含：文字中出现即命中，遵循拆字匹配开关。\n整词：两侧不能紧邻字母、数字、下划线或汉字，适合英文短词；不进行中文分词。\n整句：整条文字与关键词相同才命中。\n均忽略大小写、全半角和零宽字符；整词、整句不使用拆字匹配。\n图片识别仍需满足OCR的置信度与至少4字限制。', p0=rule['value'], p1=WORD_MODES[rule['mode']]))
         kb = [[b(label, _ui('ad:{p0}:wm_{p1}:{p2}', p0=cid, p1=mode, p2=token)) for mode, label in WORD_MODES.items()],
-              [b(_ui('🗑 删除该关键词'), _ui('ad:{p0}:word_delete:{p1}', p0=cid, p1=token))],
-              [b(_ui('⬅️ 返回词库列表'), _ui('wl:{p0}:0', p0=cid))]]
+              [b(_ui('🗑 删除该关键词'), _ui('ad:{p0}:word_delete:{p1}', p0=cid, p1=token))]]
+        self.bot.feature_help.add_admin(kb, cid, "wordlist")
+        kb.append([b(_ui('⬅️ 返回词库列表'), _ui('wl:{p0}:0', p0=cid))])
         return self.bot._edit_or_send(uid, mid, text, kb)
 
     def search_page(self, uid, cid, token, page, mid=None):
@@ -108,6 +109,7 @@ class AdminUI:
         if nav:
             kb.append(nav)
         kb.append([self.bot._button(_ui('🔎 重新搜索'), _ui('ad:{p0}:begin:word_search', p0=cid))])
+        self.bot.feature_help.add_admin(kb, cid, "wordlist")
         kb += self.back(cid, "words")
         text = (_ui('🔎 搜索：{p0}\n共 {p1} 条 · 第 {p2}/{p3} 页\n点击条目设置匹配方式或删除。', p0=choice['query'], p1=count, p2=page + 1, p3=pages) + (_ui('\n没有符合的关键词。') if not rows else ""))
         return self.bot._edit_or_send(uid, mid, text, kb)
@@ -467,6 +469,7 @@ class AdminUI:
         if nav:
             kb.append(nav)
         kb.append([b(_ui('🔄 刷新'), _ui('ad:{p0}:{p1}:{p2}', p0=cid, p1=page, p2=index))])
+        bot.feature_help.add_admin(kb, cid, page)
         return title+_ui('\n第 {p0}/{p1} 页\n', p0=index + 1, p1=pages)+(join_text('\n', lines) or _ui('暂无记录')), kb
 
     def callback(self, query, cid, parts):
