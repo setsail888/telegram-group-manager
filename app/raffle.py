@@ -62,18 +62,22 @@ class Raffles:
             return {"joined": bool(cur.rowcount), "raffle_id": raffle["id"],
                     "count": count + int(bool(cur.rowcount))}
 
-    def draw(self, chat_id, admin_id, now=None):
+    def draw(self, chat_id, admin_id, now=None, *, selected_user=None, expected_id=None):
         moment = int(time.time() if now is None else now)
         with self.tx():
             raffle = self.active(chat_id)
             if raffle is None:
                 raise ValueError("没有可开奖的免费抽奖")
+            if expected_id is not None and raffle["id"] != expected_id:
+                raise ValueError("活动已变化，请重新开奖。")
             entrants = [r[0] for r in self.db.execute(
                 "SELECT user_id FROM raffle_entries WHERE raffle_id=? ORDER BY user_id",
                 (raffle["id"],))]
             if not entrants:
                 raise ValueError("没有参与者，不能开奖")
-            selected = entrants[secrets.randbelow(len(entrants))]
+            selected = entrants[secrets.randbelow(len(entrants))] if selected_user is None else selected_user
+            if selected not in entrants:
+                raise ValueError("候选报名已失效，请重试。")
             cursor = self.db.execute(
                 "UPDATE raffles SET status='drawn',winner_id=?,finished_at=? "
                 "WHERE chat_id=? AND id=? AND status='open'",
@@ -92,13 +96,13 @@ class Raffles:
                 (moment, int(chat_id)))
             return cur.rowcount == 1
 
-    def drop_member(self, chat_id, user_id):
+    def drop_member(self, chat_id, user_id, *, raffle_id=None):
         """Remove departed users from still-open raffles only."""
         return self.db.execute(
             "DELETE FROM raffle_entries WHERE chat_id=? AND user_id=? "
             "AND raffle_id IN (SELECT id FROM raffles "
-            "WHERE chat_id=? AND status='open')",
-            (int(chat_id), int(user_id), int(chat_id))).rowcount
+            "WHERE chat_id=? AND status='open') AND (? IS NULL OR raffle_id=?)",
+            (int(chat_id), int(user_id), int(chat_id), raffle_id, raffle_id)).rowcount
 
     def history(self, chat_id, limit=8):
         return [dict(r) for r in self.db.execute(

@@ -1,6 +1,7 @@
 """Member self-service in private chat; each click checks current group membership."""
 import secrets
 import time
+from .membership import is_current_member
 
 
 class MemberUI:
@@ -15,8 +16,7 @@ class MemberUI:
         person = self.bot.api.safe("getChatMember",chat_id=cid,user_id=uid)
         if not isinstance(person,dict):
             return False
-        return (person.get("status") in ("creator","administrator","member") or
-                person.get("status")=="restricted" and person.get("is_member") is True)
+        return is_current_member(person)
 
     def render(self,cid,uid,mid=None):
         if not self.member(cid,uid):

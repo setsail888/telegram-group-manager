@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -156,6 +157,17 @@ class SchedulingStorageTests(unittest.TestCase):
         task = self.store.schedule(-100, task_id)
         self.assertTrue(task["enabled"])
         self.assertEqual(task["failures"], 1)
+
+    def test_unknown_membership_retries_without_disabling_or_sending(self):
+        task_id = self.add()
+        for status in (None, {}, {"status": "unknown"}):
+            with self.subTest(status=status), patch.object(self.bot.api, "call", return_value=status):
+                self.assertEqual(process_due_schedules(self.bot, now=NOW), 0)
+            task = self.store.schedule(-100, task_id)
+            self.assertTrue(task["enabled"])
+            self.assertGreater(task["failures"], 0)
+            self.store.db.execute("UPDATE scheduled_messages SET claim_until=0 WHERE id=?", (task_id,))
+        self.assertFalse(self.bot.sent)
 
     def test_stale_once_skipped(self):
         task_id = self.add(due=NOW - MAX_LATENESS - 1)

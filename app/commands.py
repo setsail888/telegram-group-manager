@@ -2,7 +2,7 @@
 import re
 import time
 
-from .moderation import normalize, normalize_domain, match_words
+from .moderation import normalize, normalize_domain
 from .economy_commands import (
     MEMBER_COMMANDS as ECONOMY_MEMBER_COMMANDS,
     ADMIN_COMMANDS as ECONOMY_ADMIN_COMMANDS,
@@ -378,14 +378,11 @@ def handle_command(bot, message):
         elif command == "wordtest":
             if not 2 <= len(argument) <= 1000:
                 raise ValueError("用法：/wordtest 测试文字（2–1000字，不会删除）")
-            found = match_words(
-                argument, [r["key"] for r in bot.store.filters(chat_id, "word")],
-                loose=settings["word_loose_match"],
-                exceptions=[r["key"] for r in
-                            bot.store.filters(chat_id, "word_exception")],
-                modes=bot.store.word_modes(chat_id))
+            hit = bot.store.word_policy(chat_id).hit({"text": argument}, loose=settings["word_loose_match"])
+            found = hit["word"] if hit else None
             bot.send(chat_id, "🧪 违禁词测试（不处罚）："
-                     + (f"命中 {str(found)[:75]}" if found else "未命中关键词"))
+                     + (f"命中 {str(found)[:75]}" if found else "未命中关键词")
+                     + ("（分类词库仅观察）" if hit and hit["observe"] else ""))
         elif command in ("wordexcept", "delwordexcept"):
             phrase, sep, context = argument.partition("|")
             keyword, context = normalize(phrase.strip()), normalize(context.strip())
@@ -412,8 +409,9 @@ def handle_command(bot, message):
                 bot.store.del_filter(chat_id, "word", key)
             bot.send(chat_id, "✅ 违禁词已更新。")
         elif command == "words":
-            words = [r["value"] for r in bot.store.filters(chat_id, "word")]
-            bot.send(chat_id, "⛔ 违禁词：\n" + (", ".join(words[:75]) or "暂无"))
+            words = [r["value"] for r in bot.store.filter_page(chat_id, "word", 0, page_size=30)]
+            bot.send(chat_id, "⛔ 自定义违禁词（前30条）：\n" + (", ".join(words) or "暂无")
+                     + "\n完整搜索、分类词库和文件导入请使用 /panel。")
         elif command in ("allowdomain", "deldomain"):
             domain = normalize_domain(argument)
             if not domain:

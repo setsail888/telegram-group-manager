@@ -10,9 +10,14 @@ from datetime import datetime
 from .moderation import normalize_domain, evaluate, WORD_MODES
 from .reply_rules import parse_keywords, parse_buttons, media_from_reply
 from .scheduler import parse_rule, next_occurrence, format_run
+from .word_library import parse_import, IMPORT_BYTES
+from .membership import is_current_member
 
 
 FORMS = {
+    "word_import": ("words", (("content", "发送UTF-8词库文件（单次最多1 MiB）或粘贴文字。每行一词；支持 匹配方式+Tab+词 或JSONL。总条数不限，可分批追加。已有词保持原规则。"),)),
+    "pack_exclude": ("wordpacks", (("text", "发送要从内置词库排除的完整词条（2–80字）；不会豁免同名自定义规则。"),)),
+    "pack_restore": ("wordpacks", (("text", "发送要恢复的完整内置词条（2–80字）。"),)),
     "word_search": ("words", (("query", "发送搜索文字（1–80字），按文字查找词库。"),)),
     "domain_add": ("domains", (("domains", "发送域名，每行一个（最多80个）。例如 example.com；其子域名也会放行。"),)),
     "reply_add": ("replies", (("keywords", "发送触发关键词，多个词用逗号隔开。"),
@@ -44,6 +49,7 @@ class AdminUI:
         self.drafts = {}
         self.word_choices = {}
         self.searches = {}
+        self.exports = {}
 
     def cancel(self, uid):
         self.drafts.pop(uid, None)
@@ -178,11 +184,14 @@ class AdminUI:
                 self._prompt(uid, draft)
             elif op == "spam_test":
                 conf = self.bot.store.settings(cid)
+                policy = self.bot.store.word_policy(cid)
                 reason = evaluate({"text": text}, conf,
-                    [r["key"] for r in self.bot.store.filters(cid, "word")],
+                    policy.custom,
                     [r["key"] for r in self.bot.store.filters(cid, "domain")],
-                    exceptions=[r["key"] for r in self.bot.store.filters(cid, "word_exception")],
-                    modes=self.bot.store.word_modes(cid))
+                    exceptions=policy.exceptions)
+                if not reason and conf["word_filter_enabled"]:
+                    hit = policy.pack_hit({"text": text}, loose=conf["word_loose_match"])
+                    reason = (f"分类词库：{hit['word']}" + ("（仅观察）" if hit["observe"] else "") if hit else None)
                 self.cancel(uid)
                 self.bot.send(uid, "🧪 文字规则测试：" + (reason or "未命中") + "\n不包含图片、隐藏实体、频率或成员身份检查。",
                               reply_markup={"inline_keyboard": self.back(cid, "spam")})
@@ -190,6 +199,12 @@ class AdminUI:
                 token = self._token(self.searches, uid, cid, query=value)
                 self.cancel(uid)
                 self.search_page(uid, cid, token, 0)
+            elif op == "word_import":
+                values["revision"] = self.bot.store.word_revision(cid)
+                self.bot.word_ui.preview_import(uid, draft)
+            elif op in ("pack_exclude", "pack_restore"):
+                values["revision"] = self.bot.store.word_revision(cid)
+                self._preview(uid, draft, ("排除内置词：" if op == "pack_exclude" else "恢复内置词：") + value)
             else:
                 if op == "reply_add":
                     values["previous"] = next((r for r in self.bot.store.replies(cid)
@@ -224,6 +239,23 @@ class AdminUI:
         return True
 
     def _validate(self, op, key, text, message, values):
+        if op == "word_import":
+            if sum(d["op"] == "word_import" and "content" in d["values"] for d in self.drafts.values()) >= 4:
+                raise ValueError("并发词库导入预览已满，请稍后重试。")
+            document = message.get("document")
+            if document:
+                if not document.get("file_id") or int(document.get("file_size") or 0) > IMPORT_BYTES:
+                    raise ValueError("文件缺少ID或超过1 MiB，可分批追加。")
+                from .api import TelegramAPIError
+                try:
+                    text = self.bot.api.fetch_file(document["file_id"], max_bytes=IMPORT_BYTES)
+                except TelegramAPIError:
+                    raise ValueError("文件下载失败，请检查网络后重试。") from None
+            return parse_import(text)
+        if op in ("pack_exclude", "pack_restore"):
+            if not 2 <= len(text) <= 80:
+                raise ValueError("词条需为2–80字。")
+            return text
         if key == "domains":
             fragments = [s.strip() for s in text.replace("，", "\n").replace(",", "\n").splitlines() if s.strip()]
             domains = [normalize_domain(s) for s in fragments]
@@ -306,6 +338,10 @@ class AdminUI:
         elif page == "words":
             text += "\n词库列表支持逐词选择包含、整词或整句匹配。"
             keyboard.append([add("🔎 搜索词库", "word_search")])
+            keyboard.append([b("📚 分类词库", f"v:{cid}:wordpacks"), add("📥 文件导入", "word_import")])
+            keyboard.append([b("📤 导出自定义词库", f"ad:{cid}:wordexport:0")])
+        elif page == "wordpacks":
+            text, keyboard = self.bot.word_ui.home(cid)
         elif page == "raid":
             conf = self.bot.store.settings(cid)
             until = self.bot.store.raid_until(cid)
@@ -389,6 +425,8 @@ class AdminUI:
             if page == "audit":
                 stamp = datetime.fromtimestamp(row['created_at'],store.tz).strftime("%m-%d %H:%M")
                 lines.append(f"#{row['id']} {stamp} · 消息{row['message_id']} · {row['target_id']} · {row['reason']} · {outcomes[row['outcome']]}" + (" · 已复核" if row['reviewed_by'] else ""))
+                if row.get("rule_key"):
+                    lines.append(f"  规则：{row['rule_key']}" + (f" · 分类：{row['pack_id']}" if row.get("pack_id") else " · 自定义"))
                 buttons = [b(f"✓ 复核 #{row['id']}", f"ad:{cid}:review:{row['id']}")]
                 if str(cid).startswith("-100"):
                     buttons.append({"text": "查看原消息", "url": f"https://t.me/c/{str(cid)[4:]}/{row['message_id']}"})
@@ -448,6 +486,8 @@ class AdminUI:
                 draft = self._draft(uid, cid, arg, FORMS[arg][0])
                 bot.answer(qid)
                 return self._prompt(uid, draft)
+            if action in ("pack", "packmode", "packpreset", "packpage", "pexclude", "wordexport"):
+                return bot.word_ui.callback(uid, cid, action, arg, mid, qid)
             if action == "word":
                 self.word_choice(uid, cid, arg)
                 bot.answer(qid)
@@ -530,6 +570,8 @@ class AdminUI:
     def commit(self, uid, draft):
         bot, store, cid = self.bot, self.bot.store, draft["cid"]
         op, v = draft["op"], draft["values"]
+        if op.startswith("library_") or op in ("word_import", "pack_exclude", "pack_restore"):
+            return bot.word_ui.commit(uid, draft)
         if op in ("word_mode", "word_delete"):
             store.edit_word_rule(cid, v["expected"]["key"], v["mode"], expected=v["expected"])
             return "关键词已删除。" if v["mode"] is None else "关键词匹配方式已更新。"
@@ -588,7 +630,7 @@ class AdminUI:
             if not active or active["id"]!=v["id"]:
                 raise ValueError("活动已变化，请重新预览。")
             if op == "draw":
-                result = bot.raffles.draw(cid,uid)
+                result = bot.draw_raffle(cid,uid,expected_id=v["id"])
                 # Announcement is best effort; result persists even when delivery fails.
                 body = f"🎉 免费抽奖 #{result['id']} {result['title']}\n参与 {result['count']} 人 · 获胜成员ID：{result['winner_id']}"
                 posted = bot.send(cid,body)
@@ -602,7 +644,7 @@ class AdminUI:
             store.set(cid,"ocr_mode",v["mode"])
         elif op == "point_adjust":
             person = bot.api.safe("getChatMember",chat_id=cid,user_id=v["target"])
-            if not isinstance(person,dict) or person.get("status") not in ("member","restricted","creator","administrator"):
+            if not is_current_member(person):
                 raise ValueError("目标不是当前群成员。")
             balance = store.change_points(cid,v["target"],v["amount"],uid)
             return f"积分已调整：成员 {v['target']}，当前余额 {balance}。"

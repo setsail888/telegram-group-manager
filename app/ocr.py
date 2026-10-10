@@ -16,7 +16,9 @@ from queue import Empty, Queue
 from threading import BoundedSemaphore
 
 from .api import TelegramAPIError
-from .moderation import normalize, match_words
+from .moderation import normalize, word_waivers
+from .keyword_matcher import KeywordMatcher
+from functools import lru_cache
 
 LOG = logging.getLogger("groupguard.ocr")
 MAX_OCR_FILE_BYTES = 3_000_000
@@ -57,30 +59,52 @@ def extract_tesseract(data):
     return (" ".join(tokens)[:4000], sum(scores) / len(scores))
 
 
-def matched_words(text, confidence, keywords, threshold=65, *, exceptions=(), modes=None):
+def _ocr_compact(text):
+    return re.sub(r"[\s\W_]+", "", normalize(text), flags=re.UNICODE)
+
+
+@lru_cache(maxsize=4)
+def _ocr_rules(keywords, modes):
+    modes, dense_rules, word_rules, positions = dict(modes), [], [], {}
+    for index, phrase in enumerate(keywords):
+        original, candidate = normalize(phrase), _ocr_compact(phrase)
+        if not 4 <= len(candidate) <= 80:
+            continue
+        positions.setdefault(candidate, index)
+        mode = modes.get(original, "contains")
+        if mode == "word":
+            word_rules.append((original, original, candidate, mode, False))
+        else:
+            dense_rules.append((candidate, candidate, candidate, mode, False))
+    return KeywordMatcher(dense_rules), KeywordMatcher(word_rules), positions
+
+
+def compile_ocr_words(keywords, modes=None):
+    return _ocr_rules(tuple(keywords), tuple(sorted((normalize(k), v) for k, v in (modes or {}).items())))
+
+
+def matched_words(text, confidence, keywords, threshold=65, *, exceptions=(), modes=None,
+                  excluded=frozenset(), compiled=None):
     """Return normalized phrases only for high-confidence >=4-character matches."""
     if not text or not math.isfinite(confidence) or confidence < threshold:
         return []
-    normalized_text = re.sub(r"[\s\W_]+", "", normalize(text), flags=re.UNICODE)
+    normalized_text = _ocr_compact(text)
     exempt = set()
-    for value in exceptions:
-        phrase, separator, context = normalize(value).partition("|")
-        if separator and normalized_text == re.sub(r"[\s\W_]+", "", context, flags=re.UNICODE):
-            exempt.add(re.sub(r"[\s\W_]+", "", phrase, flags=re.UNICODE))
-    hits = []
-    modes = {normalize(k): v for k, v in (modes or {}).items()}
-    for phrase in keywords:
-        candidate = re.sub(r"[\s\W_]+", "", normalize(phrase), flags=re.UNICODE)
-        mode = modes.get(normalize(phrase), "contains")
-        if mode == "exact":
-            hit = normalized_text == candidate
-        elif mode == "word":
-            hit = match_words(text, [phrase], modes={phrase: "word"}) is not None
-        else:
-            hit = candidate in normalized_text
-        if 4 <= len(candidate) <= 80 and hit and candidate not in exempt:
-            hits.append(candidate)
-    return list(dict.fromkeys(hits))[:4]
+    for phrase, context in word_waivers(exceptions):
+        if normalized_text == _ocr_compact(context):
+            exempt.add(_ocr_compact(phrase))
+    dense, words, positions = compiled if compiled is not None else compile_ocr_words(keywords, modes)
+    hits = set()
+    for matcher, content, compacted in ((dense, normalized_text, True), (words, normalize(text), False)):
+        blocked = {_ocr_compact(w) if compacted else normalize(w) for w in excluded}
+        blocked.update(exempt if compacted else {r[1] for r in words.rules if r[2] in exempt})
+        for _ in range(4):
+            word = matcher.find(content, excluded=blocked)
+            if word is None:
+                break
+            hits.add(_ocr_compact(word))
+            blocked.add(word)
+    return sorted(hits, key=positions.__getitem__)[:4]
 
 
 class OCRWorker:

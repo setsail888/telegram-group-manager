@@ -3,9 +3,11 @@ import json
 import os
 import sqlite3
 import time
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from .moderation import WORD_MODES, normalize
+from .word_library import WordPolicy, catalog, PACK_MODES
 
 DEFAULTS = {
     "block_links": True,
@@ -106,6 +108,7 @@ class Store:
         if path != ":memory:":
             self.db.execute("PRAGMA journal_mode=WAL")
         self.tz = ZoneInfo(timezone)
+        self._word_cache = OrderedDict()
         self._init()
 
     def _init(self):
@@ -271,6 +274,17 @@ class Store:
               PRIMARY KEY(chat_id,kind,key),
               FOREIGN KEY(chat_id,kind,key) REFERENCES filters(chat_id,kind,key) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS word_packs (
+              chat_id INTEGER NOT NULL, pack_id TEXT NOT NULL,
+              mode TEXT NOT NULL CHECK(mode IN ('off','observe','enforce')),
+              PRIMARY KEY(chat_id,pack_id)
+            );
+            CREATE TABLE IF NOT EXISTS word_exclusions (
+              chat_id INTEGER NOT NULL, key TEXT NOT NULL, PRIMARY KEY(chat_id,key)
+            );
+            CREATE TABLE IF NOT EXISTS word_revisions (
+              chat_id INTEGER PRIMARY KEY, version INTEGER NOT NULL DEFAULT 0
+            );
             CREATE TABLE IF NOT EXISTS raid_state (
               chat_id INTEGER PRIMARY KEY, until_at INTEGER NOT NULL
             );
@@ -304,6 +318,26 @@ class Store:
         ):
             if column not in existing:
                 self.db.execute(f"ALTER TABLE replies ADD COLUMN {column} {definition}")
+        audit_columns = {r[1] for r in self.db.execute("PRAGMA table_info(moderation_audit)")}
+        for column in ("rule_key", "pack_id"):
+            if column not in audit_columns:
+                self.db.execute(f"ALTER TABLE moderation_audit ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+        # Database triggers also invalidate caches after direct SQL/another connection.
+        for table in ("filters", "word_modes", "word_packs", "word_exclusions"):
+            for operation in ("INSERT", "UPDATE", "DELETE"):
+                row = "OLD" if operation == "DELETE" else "NEW"
+                condition = ""
+                if table == "filters":
+                    condition = f"WHEN {row}.kind IN ('word','word_exception')"
+                    if operation == "UPDATE":
+                        condition += " OR OLD.kind IN ('word','word_exception')"
+                body = (f"INSERT INTO word_revisions VALUES({row}.chat_id,1) "
+                        "ON CONFLICT(chat_id) DO UPDATE SET version=version+1;")
+                if operation == "UPDATE":
+                    body += ("INSERT INTO word_revisions SELECT OLD.chat_id,1 WHERE OLD.chat_id<>NEW.chat_id "
+                             "ON CONFLICT(chat_id) DO UPDATE SET version=version+1;")
+                self.db.execute(f"CREATE TRIGGER IF NOT EXISTS word_rev_{table}_{operation} "
+                                f"AFTER {operation} ON {table} {condition} BEGIN {body} END")
 
     def ensure_chat(self, chat_id, title):
         chat_id = int(chat_id)
@@ -377,13 +411,14 @@ class Store:
     def add_filter(self, chat_id, kind, key, value):
         if kind not in ("word", "domain", "word_exception"):
             raise ValueError("未知类型")
-        count = self.db.execute("SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
-                                (int(chat_id), kind)).fetchone()[0]
-        exists = self.db.execute(
-            "SELECT 1 FROM filters WHERE chat_id=? AND kind=? AND key=?",
-            (int(chat_id), kind, str(key))).fetchone()
-        if count >= 300 and not exists:
-            raise ValueError("每类规则最多 300 条")
+        if kind == "domain":
+            count = self.db.execute("SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
+                                    (int(chat_id), kind)).fetchone()[0]
+            exists = self.db.execute(
+                "SELECT 1 FROM filters WHERE chat_id=? AND kind=? AND key=?",
+                (int(chat_id), kind, str(key))).fetchone()
+            if count >= 300 and not exists:
+                raise ValueError("域名规则最多 300 条")
         self.db.execute("INSERT INTO filters VALUES (?,?,?,?) "
                         "ON CONFLICT(chat_id,kind,key) DO UPDATE SET value=excluded.value",
                         (int(chat_id), kind, str(key), str(value)))
@@ -410,7 +445,7 @@ class Store:
         """User-requested list only; never expand the main panel."""
         if kind != "word":
             raise ValueError("只支持查看当前群的违禁词列表")
-        if type(page) is not int or page < 0 or page > 100:
+        if type(page) is not int or page < 0 or page > 2**63 // max(1, page_size)-1:
             raise ValueError("列表页码无效")
         return [dict(row) for row in self.db.execute(
             "SELECT key,value FROM filters WHERE chat_id=? AND kind=? "
@@ -449,11 +484,12 @@ class Store:
         unique = {str(key): str(value) for key, value in entries}
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            existing = {r[0] for r in self.db.execute(
-                "SELECT key FROM filters WHERE chat_id=? AND kind=?",
-                (int(chat_id), kind))}
-            if len(existing | set(unique)) > 300:
-                raise ValueError("超过每群每类 300 条上限，本次没有导入任何规则")
+            if kind == "domain":
+                existing = {r[0] for r in self.db.execute(
+                    "SELECT key FROM filters WHERE chat_id=? AND kind=?",
+                    (int(chat_id), kind))}
+                if len(existing | set(unique)) > 300:
+                    raise ValueError("超过每群域名 300 条上限，本次没有导入任何规则")
             for key, value in unique.items():
                 self.db.execute("INSERT INTO filters VALUES (?,?,?,?) "
                                 "ON CONFLICT(chat_id,kind,key) DO UPDATE SET value=excluded.value",
@@ -467,6 +503,97 @@ class Store:
     def word_modes(self, chat_id):
         return {r["key"]: r["mode"] for r in self.db.execute(
             "SELECT key,mode FROM word_modes WHERE chat_id=?", (int(chat_id),))}
+
+    def word_revision(self, chat_id):
+        row = self.db.execute("SELECT version FROM word_revisions WHERE chat_id=?", (int(chat_id),)).fetchone()
+        return row[0] if row else 0
+
+    def pack_modes(self, chat_id):
+        return {r[0]: r[1] for r in self.db.execute("SELECT pack_id,mode FROM word_packs WHERE chat_id=?",
+                                                  (int(chat_id),))}
+
+    def word_policy(self, chat_id):
+        cid, revision = int(chat_id), self.word_revision(chat_id)
+        cached = self._word_cache.get(cid)
+        if cached and cached[0] == revision:
+            self._word_cache.move_to_end(cid)
+            return cached[1]
+        policy = WordPolicy(self.filters(cid, "word"), self.word_modes(cid),
+                            [r["key"] for r in self.filters(cid, "word_exception")], self.pack_modes(cid),
+                            [r[0] for r in self.db.execute("SELECT key FROM word_exclusions WHERE chat_id=?", (cid,))])
+        self._word_cache[cid] = (revision, policy)
+        self._word_cache.move_to_end(cid)
+        while len(self._word_cache) > 8:
+            self._word_cache.popitem(last=False)
+        return policy
+
+    def set_pack_modes(self, chat_id, changes, *, expected=None):
+        if not changes or any(key not in catalog() or mode not in PACK_MODES for key, mode in changes.items()):
+            raise ValueError("未知词库分类或模式。")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if expected is not None and self.word_revision(chat_id) != expected:
+                raise ValueError("词库已被修改，请重新预览。")
+            self.db.executemany("INSERT INTO word_packs VALUES(?,?,?) ON CONFLICT(chat_id,pack_id) "
+                                "DO UPDATE SET mode=excluded.mode", [(int(chat_id), key, mode) for key, mode in changes.items()])
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def exclude_word(self, chat_id, word, *, exclude=True, expected=None):
+        word = normalize(word)
+        if not 2 <= len(word) <= 80:
+            raise ValueError("词条需为2–80字。")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if expected is not None and self.word_revision(chat_id) != expected:
+                raise ValueError("词库已被修改，请重新预览。")
+            if exclude:
+                self.db.execute("INSERT OR IGNORE INTO word_exclusions VALUES(?,?)", (int(chat_id), word))
+            else:
+                self.db.execute("DELETE FROM word_exclusions WHERE chat_id=? AND key=?", (int(chat_id), word))
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def import_words(self, chat_id, entries, *, expected=None):
+        if not entries or any(not 2 <= len(key) <= 80 or mode not in WORD_MODES for key, _, mode in entries):
+            raise ValueError("导入词条或匹配方式无效。")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if expected is not None and self.word_revision(chat_id) != expected:
+                raise ValueError("词库已被修改，请重新导入预览。")
+            existing = {r[0] for r in self.db.execute("SELECT key FROM filters WHERE chat_id=? AND kind='word'", (int(chat_id),))}
+            added = 0
+            for key, label, mode in entries:
+                if key in existing:
+                    continue
+                self.db.execute("INSERT INTO filters VALUES(?,'word',?,?)", (int(chat_id), key, label))
+                self.db.execute("INSERT INTO word_modes(chat_id,key,mode) VALUES(?,?,?)", (int(chat_id), key, mode))
+                existing.add(key)
+                added += 1
+            self.db.execute("COMMIT")
+            return added
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+
+    def export_words(self, chat_id, after="", max_bytes=900_000):
+        data = bytearray(b"# GroupGuard custom words; UTF-8 JSONL\n")
+        count, last, more = 0, after, False
+        rows = self.db.execute("SELECT f.key,f.value,COALESCE(m.mode,'contains') AS mode FROM filters f "
+            "LEFT JOIN word_modes m USING(chat_id,kind,key) WHERE f.chat_id=? AND f.kind='word' AND f.key>? ORDER BY f.key",
+            (int(chat_id), after))
+        for row in rows:
+            line = (json.dumps({"word": row["key"], "label": row["value"], "mode": row["mode"]}, ensure_ascii=False)+"\n").encode("utf-8")
+            if len(data)+len(line) > max_bytes:
+                more = True
+                break
+            data.extend(line)
+            count, last = count+1, row["key"]
+        return bytes(data), last, more, count
 
     def word_rule(self, chat_id, key):
         row = self.db.execute(
@@ -606,19 +733,22 @@ class Store:
                         (int(chat_id), int(user_id)))
         return self.pending(chat_id, user_id)
 
-    def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None):
+    def audit(self, chat_id, message_id, target_id, reason, outcome, source="text", now=None, *, rule_key="", pack_id=""):
         """Bounded metadata only. Observation never enters punitive strike history."""
         if outcome not in ("observed", "deleted", "failed") or source not in ("text", "ocr", "channel"):
             raise ValueError("未知审核状态")
         when = int(time.time() if now is None else now)
         self.db.execute(
-            "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at) "
-            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
+            "INSERT INTO moderation_audit(chat_id,message_id,target_id,reason,source,outcome,created_at,rule_key,pack_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(chat_id,message_id,source) DO UPDATE SET "
             "reason=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reason ELSE excluded.reason END,"
             "outcome=CASE WHEN moderation_audit.outcome='deleted' THEN 'deleted' ELSE excluded.outcome END,"
             "reviewed_by=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.reviewed_by ELSE NULL END,"
+            "rule_key=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.rule_key ELSE excluded.rule_key END,"
+            "pack_id=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.pack_id ELSE excluded.pack_id END,"
             "created_at=CASE WHEN moderation_audit.outcome='deleted' THEN moderation_audit.created_at ELSE excluded.created_at END",
-            (int(chat_id), int(message_id), int(target_id), str(reason)[:100], source, outcome, when))
+            (int(chat_id), int(message_id), int(target_id), str(reason)[:100], source, outcome, when,
+             str(rule_key or "")[:80], str(pack_id)[:40]))
         self.db.execute("DELETE FROM moderation_audit WHERE created_at<?", (when - 30*86400,))
         self.db.execute("DELETE FROM moderation_audit WHERE chat_id=? AND id NOT IN "
                         "(SELECT id FROM moderation_audit WHERE chat_id=? ORDER BY id DESC LIMIT 1000)",

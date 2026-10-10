@@ -6,6 +6,7 @@ from collections import OrderedDict, deque
 from functools import lru_cache
 from hashlib import sha256
 from urllib.parse import urlsplit
+from .keyword_matcher import KeywordMatcher
 
 _LINK = re.compile(
     r"(?<![a-z0-9_@])(?:https?://|www\.)[^\s<>\u3000,;!\"'()，。！？；（）《》「」『』]+|"
@@ -35,7 +36,7 @@ def compact(value):
         ("P", "Z", "S", "M")) and not c.isspace())
 
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=8)
 def _word_rules(words, exceptions, modes=()):
     """Reuse normalized rules; immutable keys make edits take effect immediately."""
     rules = []
@@ -48,37 +49,61 @@ def _word_rules(words, exceptions, modes=()):
             mode = modes.get(phrase, "contains")
             if mode not in WORD_MODES:
                 raise ValueError("未知关键词匹配方式")
-            boundary = re.compile(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)") if mode == "word" else None
-            rules.append((word, phrase, dense, len(dense) >= minimum, mode, boundary))
+            rules.append((word, phrase, dense, mode, len(dense) >= minimum))
     waived = set()
     for rule in exceptions:
         prefix, sep, context = rule.partition("|")
         if sep and normalize(context):
             waived.add((normalize(prefix), normalize(context)))
-    return tuple(rules), frozenset(waived)
+    return KeywordMatcher(rules), frozenset(waived)
+
+
+class WordWaivers(frozenset):
+    """Marks normalized pairs so hot scans need no per-exception type checks."""
+
+
+def word_waivers(exceptions):
+    if isinstance(exceptions, WordWaivers):
+        return exceptions
+    if isinstance(exceptions, frozenset) and all(isinstance(e, tuple) for e in exceptions):
+        return WordWaivers(exceptions)
+    waived = set()
+    for rule in exceptions:
+        prefix, sep, context = str(rule).partition("|")
+        if sep and normalize(context):
+            waived.add((normalize(prefix), normalize(context)))
+    return WordWaivers(waived)
+
+
+def compile_words(words, modes=None):
+    return _word_rules(tuple(str(w) for w in words), (),
+                       tuple(sorted((normalize(k), v) for k, v in (modes or {}).items())))[0]
 
 
 def match_words(text, banned_words, *, loose=False, exceptions=(), modes=None):
     """Return the matching banned word; exceptions only waive their own rule."""
     clean = normalize(text)
     dense = compact(clean) if loose else ""
-    rules, waived = _word_rules(tuple(str(w) for w in banned_words),
-                                tuple(str(e) for e in exceptions),
-                                tuple(sorted((normalize(k), v) for k, v in (modes or {}).items())))
-    for word, phrase, dense_keyword, allowed_loose, mode, boundary in rules:
-        # Loose mode is opt-in and requires enough characters to reduce
-        # false positives on short, common Chinese/English substrings.
-        if mode == "exact":
-            found = phrase == clean
-        elif mode == "word":
-            found = boundary.search(clean) is not None
-        else:
-            found = phrase in clean or (loose and allowed_loose and dense_keyword in dense)
-        if not found:
-            continue
-        # Waive only this rule and this exact normalized message.
-        if (phrase, clean) not in waived:
-            return word
+    rules = banned_words if isinstance(banned_words, KeywordMatcher) else compile_words(banned_words, modes)
+    return rules.find(clean, dense=dense if loose else None, waived=word_waivers(exceptions))
+
+
+def message_word_hit(message, banned_words, *, loose=False, exceptions=(), modes=None, excluded=frozenset()):
+    parts = [message.get("text") or message.get("caption") or ""]
+    parts += [str(b.get("text") or "") for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
+              for b in row if isinstance(b, dict)]
+    clean = normalize("\n".join(parts))
+    rules = banned_words if isinstance(banned_words, KeywordMatcher) else compile_words(banned_words, modes)
+    waived = word_waivers(exceptions)
+    hit = rules.find(clean, dense=compact(clean) if loose else None, waived=waived, excluded=excluded)
+    if hit is not None:
+        return hit
+    # Exact text is checked independently of buttons, with whole-message waivers.
+    if len(parts) > 1:
+        for part in parts:
+            hit = rules.find(normalize(part), context=clean, waived=waived, excluded=excluded, exact_only=True)
+            if hit is not None:
+                return hit
     return None
 
 
@@ -277,24 +302,10 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None,
     buttons = [button for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
                for button in row if isinstance(button, dict)]
     clean = normalize("\n".join([content] + [str(b.get("text") or "") for b in buttons]))
-    if settings.get("word_filter_enabled", True):
-        if match_words(clean, banned_words, loose=settings.get("word_loose_match", False),
-                       exceptions=exceptions, modes=modes) is not None:
-            return "违禁词"
-        # A harmless button must not let an exact body/caption evade its rule.
-        # Button labels are individual pieces of visible text as well.
-        if buttons:
-            normalized_modes = {normalize(k): v for k, v in (modes or {}).items()}
-            waived = set()
-            for exception in exceptions:
-                phrase, separator, context = str(exception).partition("|")
-                if separator and normalize(context) == clean:
-                    waived.add(normalize(phrase))
-            exact = [w for w in banned_words if normalized_modes.get(normalize(w)) == "exact"
-                     and normalize(w) not in waived]
-            if exact and any(match_words(part, exact, modes=normalized_modes) is not None
-                             for part in [content] + [str(b.get("text") or "") for b in buttons]):
-                return "违禁词"
+    if settings.get("word_filter_enabled", True) and message_word_hit(
+            message, banned_words, loose=settings.get("word_loose_match", False),
+            exceptions=exceptions, modes=modes) is not None:
+        return "违禁词"
     if settings.get("block_forward") and (
         message.get("forward_origin") or message.get("forward_from")
         or message.get("forward_from_chat")):

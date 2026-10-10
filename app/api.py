@@ -1,5 +1,6 @@
 """Small Telegram Bot API adapter: JSON POST, long polling, safe error messages."""
 import logging
+import json
 import os
 import re
 import threading
@@ -61,7 +62,7 @@ class TelegramAPI:
             session.close()
             del self._thread.session
 
-    def call(self, method, **params):
+    def call(self, method, *, _files=None, **params):
         # Long polling legitimately waits for updates. Interactive methods
         # should not stall the entire single-threaded bot for 35 seconds on
         # a degraded connection.
@@ -72,9 +73,11 @@ class TelegramAPI:
             # Sessions reuse TCP/TLS connections between successive API calls.
             # Separate connect and read timeouts bound network outages.
             try:
-                response = self._session().post(
-                    self._url + method, json=params,
-                    timeout=(5, read_timeout), allow_redirects=False)
+                payload = ({"json": params} if _files is None else
+                           {"data": {k: json.dumps(v) if isinstance(v, (dict, list)) else v for k, v in params.items()},
+                            "files": _files})
+                response = self._session().post(self._url + method, **payload,
+                                                timeout=(5, read_timeout), allow_redirects=False)
             except requests.RequestException:
                 self._drop_session()
                 # Never log a URL with the Bot Token or exception repr.
@@ -165,6 +168,9 @@ class TelegramAPI:
             return None
 
     def fetch_photo(self, file_id, max_bytes=3_000_000):
+        return self.fetch_file(file_id, max_bytes=max_bytes)
+
+    def fetch_file(self, file_id, max_bytes=1_048_576):
         """Download only a Telegram file id through getFile; never log token URL."""
         if not isinstance(file_id, str) or not 1 <= len(file_id) <= 512:
             raise TelegramAPIError("getFile", "无效文件 ID")
@@ -172,7 +178,7 @@ class TelegramAPI:
         if not isinstance(info, dict):
             raise TelegramAPIError("getFile", "文件信息无效")
         if int(info.get("file_size") or 0) > max_bytes:
-            raise TelegramAPIError("getFile", "图片文件太大")
+            raise TelegramAPIError("getFile", "文件太大")
         path = info.get("file_path", "")
         # No arbitrary URLs, path traversal or query parameters.
         if (not isinstance(path, str) or not re.fullmatch(
@@ -181,12 +187,12 @@ class TelegramAPI:
             raise TelegramAPIError("getFile", "文件路径不安全")
         request = urllib.request.Request(
             self._files_url + path,
-            headers={"Accept": "image/*"}, method="GET")
+            headers={"Accept": "application/octet-stream"}, method="GET")
         try:
             with urllib.request.urlopen(request, timeout=12) as response:
                 content = response.read(max_bytes + 1)
         except (urllib.error.URLError, TimeoutError, OSError):
-            raise TelegramAPIError("getFile", "无法下载图片") from None
+            raise TelegramAPIError("getFile", "无法下载文件") from None
         if not content or len(content) > max_bytes:
-            raise TelegramAPIError("getFile", "图片为空或超出大小限制")
+            raise TelegramAPIError("getFile", "文件为空或超出大小限制")
         return content

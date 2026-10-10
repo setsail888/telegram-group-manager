@@ -11,13 +11,15 @@ from collections import deque
 from .api import TelegramAPIError
 from .economy import Economy
 from .raffle import Raffles
-from .moderation import FloodGuard, PhotoRepeatGuard, evaluate, normalize, match_words
+from .moderation import FloodGuard, PhotoRepeatGuard, evaluate, normalize, message_word_hit
 from .ocr import OCRWorker, MAX_OCR_FILE_BYTES, matched_words
 from .scheduler import format_run, next_occurrence
 from .store import TOGGLES, NUMBER_LIMITS
 from .admin_ui import AdminUI
 from .member_ui import MemberUI
 from .raid import JoinGuard
+from .word_ui import WordUI
+from .membership import is_current_member
 
 LOG = logging.getLogger(__name__)
 GROUP_TYPES = {"group", "supergroup"}
@@ -122,6 +124,7 @@ class GroupBot:
         self.flood = FloodGuard()
         self.photo_guard = PhotoRepeatGuard()
         self.join_guard = JoinGuard()
+        self.word_ui = WordUI(self)
         self.economy = Economy(store)
         self.raffles = Raffles(store)
         self.ocr = OCRWorker(
@@ -823,14 +826,12 @@ class GroupBot:
             self.log(chat_id, "通过私聊修改关键词精确例外", actor=uid)
             return "✅ 已更新精确例外（只对完整相同的消息豁免对应关键词）。"
         if operation == "test":
-            found = match_words(
-                text, [row["key"] for row in self.store.filters(chat_id, "word")],
-                loose=self.store.settings(chat_id)["word_loose_match"],
-                exceptions=[row["key"] for row in
-                            self.store.filters(chat_id, "word_exception")],
-                modes=self.store.word_modes(chat_id))
+            hit = self.store.word_policy(chat_id).hit({"text": text},
+                loose=self.store.settings(chat_id)["word_loose_match"])
+            found = hit["word"] if hit else None
             return ("🧪 测试结果：" + (
                 f"命中 {str(found)[:70]}" if found else "没有命中违禁词") +
+                ("（分类词库仅观察）" if hit and hit["observe"] else "") +
                 "\n此操作不会处罚任何成员。")
         raise ValueError("未知的违禁词编辑操作")
 
@@ -907,9 +908,9 @@ class GroupBot:
                     "getChatMember", chat_id=cid, user_id=intent["target_id"])
             except TelegramAPIError:
                 return self.answer(qid, "暂时无法核验群成员身份，请重试", alert=True)
-            permitted = {"creator", "administrator", "member", "restricted"}
-            if left.get("status") not in permitted or right.get("status") not in permitted:
-                return self.answer(qid, "有成员已经离开本群，转账不能执行", alert=True)
+            if (not is_current_member(left) or not is_current_member(right)
+                    or self.store.pending(cid, uid) or self.store.pending(cid, intent["target_id"])):
+                return self.answer(qid, "成员身份未确认、已离群或验证未完成，转账不能执行", alert=True)
         try:
             result = self.economy.confirm_transfer(
                 cid, transfer_id, parts[3], uid, message.get("message_id"),
@@ -1041,7 +1042,7 @@ class GroupBot:
                     page = int(setting)
                 except ValueError:
                     return self.answer(qid, "页码无效", alert=True)
-                if not 0 <= page <= 100:
+                if page < 0:
                     return self.answer(qid, "页码超出范围", alert=True)
                 self.answer(qid)
                 return self._private_word_list(
@@ -1299,6 +1300,31 @@ class GroupBot:
                 name = str(member.get("first_name", "新朋友"))[:64]
                 self.send(chat_id, settings["welcome_text"].replace("{name}", name))
 
+    def draw_raffle(self, chat_id, actor, *, expected_id=None):
+        active = self.raffles.active(chat_id)
+        if not active or expected_id is not None and active["id"] != expected_id:
+            raise ValueError("活动已变化或未开放，请刷新。")
+        candidates = [r[0] for r in self.store.db.execute(
+            "SELECT user_id FROM raffle_entries WHERE raffle_id=? ORDER BY user_id", (active["id"],))]
+        if not candidates:
+            raise ValueError("没有参与者，不能开奖。")
+        # Bound network work; no scan of twenty thousand Telegram memberships.
+        for _ in range(min(3, len(candidates))):
+            target = candidates.pop(secrets.randbelow(len(candidates)))
+            try:
+                person = self.api.call("getChatMember", chat_id=chat_id, user_id=target)
+            except TelegramAPIError:
+                raise ValueError("暂时无法核实候选成员，未开奖，请稍后重试。") from None
+            if not isinstance(person, dict) or person.get("status") not in ("member", "restricted", "creator", "administrator", "left", "kicked"):
+                raise ValueError("暂时无法核实候选成员，未开奖，请稍后重试。")
+            if person.get("status") == "restricted" and type(person.get("is_member")) is not bool:
+                raise ValueError("暂时无法核实候选成员，未开奖，请稍后重试。")
+            if not is_current_member(person) or self.store.pending(chat_id, target):
+                self.raffles.drop_member(chat_id, target, raffle_id=active["id"])
+                continue
+            return self.raffles.draw(chat_id, actor, selected_user=target, expected_id=active["id"])
+        raise ValueError("本次候选已离群或验证未完成，已移除报名；请再次开奖核验下一批，活动仍开放。")
+
     def _start_verification(self, chat_id, member, settings, *, verified_member=False):
         uid = member["id"]
         # Replayed join updates must not replace the challenge or reset attempts.
@@ -1450,18 +1476,25 @@ class GroupBot:
         if user_id in admin_ids:
             return
         settings = self.store.settings(chat_id)
+        policy = self.store.word_policy(chat_id)
         reason = evaluate(message, settings,
-                          [r["key"] for r in self.store.filters(chat_id, "word")],
+                          policy.custom,
                           [r["key"] for r in self.store.filters(chat_id, "domain")],
                           self.flood,
-                          exceptions=[r["key"] for r in
-                                      self.store.filters(chat_id, "word_exception")],
-                          modes=self.store.word_modes(chat_id),
+                          exceptions=policy.exceptions,
                           is_edit=is_edit)
         if not reason and not is_edit and settings["repeat_photo_enabled"]:
             reason = self.photo_guard.check(
                 message, limit=settings["repeat_photo_limit"],
                 window=settings["repeat_photo_window"])
+        word_hit = None
+        if reason == "违禁词":
+            word_hit = {"word": message_word_hit(message, policy.custom, loose=settings["word_loose_match"],
+                                                 exceptions=policy.exceptions), "pack": "", "observe": False}
+        if not reason and settings["word_filter_enabled"]:
+            word_hit = policy.pack_hit(message, loose=settings["word_loose_match"])
+            if word_hit:
+                reason = "违禁词"
         if reason:
             # Refresh membership only before deletion. An administrator promoted
             # during the short admin-list cache window must never be auto-deleted.
@@ -1472,16 +1505,17 @@ class GroupBot:
                 return False
             if admin_status(fresh):
                 return True
-            if settings["observe_only"]:
-                self.store.audit(chat_id, message["message_id"], user_id, reason, "observed")
+            details = {"rule_key": word_hit["word"], "pack_id": word_hit["pack"]} if word_hit else {}
+            if settings["observe_only"] or word_hit and word_hit["observe"]:
+                self.store.audit(chat_id, message["message_id"], user_id, reason, "observed", **details)
                 return True
             if not self.bot_can(chat_id, "can_delete_messages"):
-                self.store.audit(chat_id, message["message_id"], user_id, reason, "failed")
+                self.store.audit(chat_id, message["message_id"], user_id, reason, "failed", **details)
                 return False
             deleted = self.api.safe("deleteMessage", chat_id=chat_id,
                                     message_id=message["message_id"])
             self.store.audit(chat_id, message["message_id"], user_id, reason,
-                             "deleted" if deleted is True else "failed")
+                             "deleted" if deleted is True else "failed", **details)
             if deleted is True:
                 self.store.stat(chat_id, "deleted")
                 self.log(chat_id, f"自动删除（{reason}）", target=user_id)
@@ -1621,12 +1655,24 @@ class GroupBot:
             mode = settings["ocr_mode"]
             if mode == "off" or not settings["word_filter_enabled"]:
                 continue
+            policy = self.store.word_policy(cid)
+            pack_id, pack_observe = "", False
             matched = matched_words(
-                text, confidence,
-                [r["key"] for r in self.store.filters(cid, "word")],
+                text, confidence, (),
                 threshold=settings["ocr_confidence"],
-                exceptions=[r["key"] for r in self.store.filters(cid, "word_exception")],
-                modes=self.store.word_modes(cid))
+                exceptions=policy.exceptions, compiled=policy.ocr_rules)
+            if not matched:
+                for state in ("enforce", "observe"):
+                    for pack, current in policy.packs:
+                        if current != state:
+                            continue
+                        matched = matched_words(text, confidence, (), compiled=pack.ocr_rules,
+                            threshold=settings["ocr_confidence"], exceptions=policy.exceptions, excluded=policy.excluded)
+                        if matched:
+                            pack_id, pack_observe = pack.id, state == "observe"
+                            break
+                    if matched:
+                        break
             if not matched:
                 continue
             try:
@@ -1636,19 +1682,21 @@ class GroupBot:
             if admin_status(person):
                 continue
             self.store.stat(cid, "ocr_hits")
-            if mode == "review" or settings["observe_only"]:
-                self.store.audit(cid, event["message_id"], uid, "OCR违禁词", "observed", "ocr")
+            details = {"rule_key": matched[0], "pack_id": pack_id}
+            if mode == "review" or settings["observe_only"] or pack_observe:
+                self.store.audit(cid, event["message_id"], uid, "OCR违禁词", "observed", "ocr", **details)
                 # No raw image, OCR text, or untrusted URL is stored in logs.
                 self.log(cid, f"🔎 OCR待审核 消息 {event['message_id']}："
                          f"命中 {','.join(matched)} / 可信度 {confidence:.0f}",
                          target=uid)
                 continue
             if mode != "delete" or not self.bot_can(cid, "can_delete_messages"):
+                self.store.audit(cid, event["message_id"], uid, "OCR违禁词", "failed", "ocr", **details)
                 continue
             deleted = self.api.safe(
                 "deleteMessage", chat_id=cid, message_id=event["message_id"])
             self.store.audit(cid, event["message_id"], uid, "OCR违禁词",
-                             "deleted" if deleted is True else "failed", "ocr")
+                             "deleted" if deleted is True else "failed", "ocr", **details)
             if deleted is True:
                 self.store.stat(cid, "deleted")
                 self.store.stat(cid, "ocr_deleted")

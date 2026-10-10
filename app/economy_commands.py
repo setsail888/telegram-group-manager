@@ -2,6 +2,7 @@
 import time
 
 from .api import TelegramAPIError
+from .membership import is_current_member
 
 MEMBER_COMMANDS = {"transfer", "shop", "buy", "myorders", "raffle", "joinraffle"}
 ADMIN_COMMANDS = {
@@ -25,7 +26,7 @@ def _member(bot, chat_id, user_id):
         info = bot.api.call("getChatMember", chat_id=chat_id, user_id=user_id)
     except TelegramAPIError:
         return False
-    return info.get("status") in ("member", "administrator", "creator", "restricted")
+    return is_current_member(info) and not bot.store.pending(chat_id, user_id)
 
 
 def _limited(bot, chat_id, user_id, command, seconds=12):
@@ -175,7 +176,7 @@ def handle_admin(bot, message, command, argument):
         elif command == "raffledraw":
             if argument:
                 raise ValueError("用法：/raffledraw")
-            result = bot.raffles.draw(cid, actor)
+            result = bot.draw_raffle(cid, actor)
             bot.send(cid, f"🎉 免费抽奖 #{result['id']} 已开奖！\n"
                      f"活动：{result['title']}\n参与：{result['count']} 人\n"
                      f"中奖用户 ID：{result['winner_id']}\n"

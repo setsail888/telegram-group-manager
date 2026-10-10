@@ -62,7 +62,7 @@ class GuardStorageTests(unittest.TestCase):
             self.store.add_filters_bulk(-100, "word", [])
         self.assertEqual(len(self.store.filters(-100, "word")), 2)
 
-    def test_existing_filter_at_capacity_can_be_replaced(self):
+    def test_custom_words_can_grow_beyond_legacy_capacity(self):
         self.store.add_filters_bulk(
             -100, "word", [(str(i) + "字", str(i) + "字") for i in range(80)])
         self.store.add_filters_bulk(
@@ -74,12 +74,9 @@ class GuardStorageTests(unittest.TestCase):
         self.assertEqual(len(self.store.filters(-100, "word")), 300)
         self.store.add_filter(-100, "word", "0字", "替换第一条")
         self.assertEqual(len(self.store.filters(-100, "word")), 300)
-        with self.assertRaises(ValueError):
-            self.store.add_filter(-100, "word", "新增规则", "新增规则")
-        with self.assertRaises(ValueError):
-            self.store.add_filters_bulk(
-                -100, "word", [("新条目", "新条目"), ("1字", "更新旧条目")])
-        self.assertEqual(len(self.store.filters(-100, "word")), 300)
+        self.store.add_filter(-100, "word", "新增规则", "新增规则")
+        self.store.add_filters_bulk(-100, "word", [("新条目", "新条目"), ("1字", "更新旧条目")])
+        self.assertEqual(len(self.store.filters(-100, "word")), 302)
 
     def test_durable_moderation_dedup_and_group_isolation(self):
         a = self.store.record_moderation(-100, 8, 10, "外链", now=1000)

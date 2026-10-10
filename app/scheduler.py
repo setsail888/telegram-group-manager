@@ -129,6 +129,10 @@ def process_due_schedules(bot, now=None, limit=10):
         except TelegramAPIError:
             bot.store.schedule_failed(item["id"], now=moment)
             continue
+        if not isinstance(member, dict) or member.get("status") not in (
+                "creator", "administrator", "member", "restricted", "left", "kicked"):
+            bot.store.schedule_failed(item["id"], now=moment)
+            continue
         if member.get("status") not in ("creator", "administrator"):
             bot.store.toggle_schedule(item["chat_id"], item["id"], False)
             bot.log(item["chat_id"], f"定时任务 #{item['id']} 创建者已不是管理员，任务已暂停")

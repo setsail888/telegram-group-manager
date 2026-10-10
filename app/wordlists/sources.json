@@ -1,0 +1,38 @@
+[
+  {
+    "file": "public_ads.txt",
+    "upstream_file": "广告.txt",
+    "repository": "https://github.com/fwwdn/sensitive-stop-words",
+    "revision": "a7d06bb1c321e669943b6841570d9da6dad8ce2b",
+    "url": "https://raw.githubusercontent.com/fwwdn/sensitive-stop-words/a7d06bb1c321e669943b6841570d9da6dad8ce2b/%E5%B9%BF%E5%91%8A.txt",
+    "license": "Apache-2.0",
+    "sha256": "5978fb1c0f47e8849215c586682a3447a22990db0dc5ae17c1a5d07302ad4eb1"
+  },
+  {
+    "file": "public_adult.txt",
+    "upstream_file": "色情类.txt",
+    "repository": "https://github.com/fwwdn/sensitive-stop-words",
+    "revision": "a7d06bb1c321e669943b6841570d9da6dad8ce2b",
+    "url": "https://raw.githubusercontent.com/fwwdn/sensitive-stop-words/a7d06bb1c321e669943b6841570d9da6dad8ce2b/%E8%89%B2%E6%83%85%E7%B1%BB.txt",
+    "license": "Apache-2.0",
+    "sha256": "2f846d586eb3f0099b1fbb53b0afee0148f09e4394912162b31eb02aee7db1d2"
+  },
+  {
+    "file": "public_danger.txt",
+    "upstream_file": "涉枪涉爆违法信息关键词.txt",
+    "repository": "https://github.com/fwwdn/sensitive-stop-words",
+    "revision": "a7d06bb1c321e669943b6841570d9da6dad8ce2b",
+    "url": "https://raw.githubusercontent.com/fwwdn/sensitive-stop-words/a7d06bb1c321e669943b6841570d9da6dad8ce2b/%E6%B6%89%E6%9E%AA%E6%B6%89%E7%88%86%E8%BF%9D%E6%B3%95%E4%BF%A1%E6%81%AF%E5%85%B3%E9%94%AE%E8%AF%8D.txt",
+    "license": "Apache-2.0",
+    "sha256": "82a319f9d2c03e6033ce51b15e03d0a18396c09d24998212c578d3056bba0dd4"
+  },
+  {
+    "file": "LICENSE-Apache-2.0",
+    "upstream_file": "LICENSE",
+    "repository": "https://github.com/fwwdn/sensitive-stop-words",
+    "revision": "a7d06bb1c321e669943b6841570d9da6dad8ce2b",
+    "url": "https://raw.githubusercontent.com/fwwdn/sensitive-stop-words/a7d06bb1c321e669943b6841570d9da6dad8ce2b/LICENSE",
+    "license": "Apache-2.0",
+    "sha256": "552e63d5bb2e8a2fcf52b57caa146429a63215d3590121fb2cac0345a4c1ea7a"
+  }
+]
