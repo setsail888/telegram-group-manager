@@ -2,6 +2,8 @@
 
 自托管的 Telegram 中文群管理机器人。通过私聊按钮配置违禁词、反垃圾、防刷屏、新人验证和成员管理，也支持积分、自动回复、公告与免费抽奖。使用 SQLite 保存数据，通过长轮询连接 Telegram，无需域名或开放入站端口。
 
+**[在线使用文档](https://slobys.github.io/telegram-group-manager/) · [全部功能导航](https://slobys.github.io/telegram-group-manager/guide/features.html) · [常见问题](https://slobys.github.io/telegram-group-manager/guide/faq.html)**
+
 ## 安装到服务器
 
 使用 Debian / Ubuntu，通过 SSH 登录服务器后执行。需要 root 或 sudo 权限，并能访问 GitHub、Docker Hub 和 Telegram；缺少 `curl` 时先按 [部署指南](docs/server-one-click.md#三一键安装复制一条命令) 安装。
@@ -74,6 +76,8 @@ gg update
 | [群内命令与功能用法](docs/commands.md) | 命令速查、积分、商城、抽奖、公告和自动回复 |
 | [管理按钮延迟排查](docs/slow-buttons.md) | 权限请求、网络与服务器耗时诊断 |
 | [功能检查与测试记录](docs/function-audit-2026-10-10.md) | 检查结果、修复范围和验证边界 |
+
+文档站支持中文搜索、按功能导航和手机阅读；[维护与本地预览](docs/reference/documentation.md)。
 
 Token 仅保存在服务器本地，请勿上传 `.env` 或数据库。卸载默认保留数据；删除数据需要额外确认。独立开发的项目，功能参考公开资料，不是其他机器人的官方版本。
 
