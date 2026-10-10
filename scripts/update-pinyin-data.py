@@ -27,21 +27,37 @@ def main():
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         original = json.loads(archive.read("pypinyin/pinyin_dict.json"))
         table = {}
+        polyphones = {}
         for key, value in original.items():
-            syllable = reading(value.split(",")[0])
-            if syllable.isascii() and syllable.isalpha():
-                table[chr(int(key))] = syllable
+            values = list(dict.fromkeys(reading(s) for s in value.split(",")))
+            values = [s for s in values if s.isascii() and s.isalpha()]
+            if values:
+                table[chr(int(key))] = values[0]
+            if len(values) > 1:
+                polyphones[chr(int(key))] = values
+        phrases = {}
+        for word, values in json.loads(archive.read("pypinyin/phrases_dict.json")).items():
+            values = [reading(s[0]) for s in values]
+            if (len(word) == len(values) and all(s.isascii() and s.isalpha() for s in values)
+                    and any(s != table.get(c) for c, s in zip(word, values))):
+                phrases[word] = values
         (ROOT / "pinyin-characters.json").write_text(
             json.dumps(table, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8", newline="\n")
+        for name, values in (("pinyin-polyphones.json", polyphones), ("pinyin-phrases.json", phrases)):
+            (ROOT / name).write_text(json.dumps(values, ensure_ascii=False, sort_keys=True, separators=(",", ":"))+"\n",
+                                     encoding="utf-8", newline="\n")
         (ROOT / "LICENSE-pypinyin-MIT.txt").write_bytes(
             archive.read("pypinyin-0.55.0.dist-info/licenses/LICENSE.txt"))
     record = {"project": "https://github.com/mozillazg/python-pinyin", "version": "0.55.0",
               "url": URL, "sha256": SHA256, "license": "MIT", "characters": len(table),
               "generated_sha256": hashlib.sha256((ROOT / "pinyin-characters.json").read_bytes()).hexdigest(),
               "license_sha256": hashlib.sha256((ROOT / "LICENSE-pypinyin-MIT.txt").read_bytes()).hexdigest(),
-              "conversion": "First listed character reading; lowercase, no tone, u-diaeresis as v. No phrase model."}
+              "polyphones": len(polyphones), "phrase_corrections": len(phrases),
+              "polyphones_sha256": hashlib.sha256((ROOT / "pinyin-polyphones.json").read_bytes()).hexdigest(),
+              "phrases_sha256": hashlib.sha256((ROOT / "pinyin-phrases.json").read_bytes()).hexdigest(),
+              "conversion": "Lowercase, toneless, u-diaeresis as v. Primary table plus distinct character readings and longest-match phrase corrections. Homophones use preferred readings only."}
     (ROOT / "pinyin-source.json").write_text(json.dumps(record, ensure_ascii=False, indent=2)+"\n", encoding="utf-8", newline="\n")
-    print(f"Generated {len(table)} character readings")
+    print(f"Generated {len(table)} primary readings, {len(polyphones)} polyphones, {len(phrases)} phrase corrections")
 
 
 if __name__ == "__main__":

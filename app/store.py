@@ -35,6 +35,8 @@ DEFAULTS = {
     "word_homophone_mode": "off",
     "word_short_split_mode": "off",
     "word_mixed_pinyin_mode": "off",
+    "word_pinyin_initials_mode": "off",
+    "word_phonetic_mode": "off",
     "word_filter_enabled": True,
     "word_penalty": "delete",
     "word_mute_minutes": 10,

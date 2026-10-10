@@ -245,7 +245,7 @@
   ],
   "词条需为2–80字。": [
     "app/admin_ui.py:269",
-    "app/store.py:638"
+    "app/store.py:640"
   ],
   "请提供1–80个有效域名，整批尚未保存。": [
     "app/admin_ui.py:275"
@@ -326,7 +326,7 @@
     "app/flood_ui.py:5",
     "app/service.py:371",
     "app/word_library.py:11",
-    "app/word_library.py:183"
+    "app/word_library.py:199"
   ],
   "正常处罚": [
     "app/admin_ui.py:330",
@@ -2594,7 +2594,7 @@
   "📚 分类违禁词库 · {p0}类 / {p1}条去重短语\n原创招揽组合与有许可证的公开词库；没有其他机器人的私有词库或实测命中率数据。\n所有分类默认关闭，建议先观察，再按群主题逐类启用处罚。\n分类观察只记录，不覆盖链接、刷屏等原有处罚；全局观察优先于所有分类。\n自定义同名词优先；关闭总违禁词开关后，分类也不执行。\n本群排除 {p2} 条（前20条）：": [
     "app/word_ui.py:22"
   ],
-  "🈶 中文变体识别\n只增强已添加或已启用分类中的「包含」规则；整词、整句规则保持原精度。\n繁简字形：賭博→赌博、刷單→刷单（字表转换，不是完整语义转换）。\n定向同音／拼音：唰单／shuadan→刷单；菠菜需同句附近有平台、投注等提示词。不是任意同音字通杀。\n短词拆字增强：刷⭐单→刷单，允许1–3个间隔符，不跨换行或按钮；可能误伤正常引用。\n拼音＋中文混写：shua单返佣、刷dan返yong→刷单返佣；只扩展至少两个汉字的包含词，不做首字母缩写或纯拼音通杀。\n四项默认关闭；组合命中时，所需功能或分类任一为观察，就仅观察。总开关和全局观察优先。\n先在分类词库选择「两字短词（严格）」或添加自定义词，再测试并观察。\n\n": [
+  "🈶 中文变体识别\n只增强已添加或已启用分类的「包含」规则；整词、整句保持原精度。\n繁简字形：刷單→刷单；固定字表转换。\n定向同音／拼音：唰单／shuadan→刷单；沿用指定别名及其上下文。\n短词拆字增强：刷⭐单→刷单，允许1–3个间隔符，不跨换行或按钮。\n拼音＋中文混写：shua单返yong、地下银hang；支持多音字的完整读音，保留原汉字。\n拼音缩写（上下文）：sdfy、刷d返y，需同句两侧24字内有日结、加我等招揽提示；纯缩写至少对应四个汉字，两三字需原汉字及专用提示。\n同音字增强（上下文）：刷单返拥，需附近招揽提示及足够原字；四至七字最多换一字，八字起最多两字；短词需专用提示。使用词组优先读音，不泛化生僻读音。\n新增缩写/同音增强避开代码、链接、账号、常见技术缩写和部分反诈引用；仍可能误判或漏判。不用于OCR自动删除；现有包含词和定向别名保持原行为。\n六项默认关闭；组合所需功能或分类任一观察，就仅观察。总开关和全局观察优先。\n先启用基础词，测试正常聊天，再切换处罚。\n\n": [
     "app/word_ui.py:35"
   ],
   "📚 {p0}\n{p1}条 · {p2} · 第{p3}/{p4}页\n{p5}\n点击词条可排除，仅影响本群内置词库。\n\n": [
@@ -2663,7 +2663,7 @@
   "{p0} · 当前{p1}": [
     "app/word_ui.py:39"
   ],
-  "🧪 四项全部先观察": [
+  "🧪 六项全部先观察": [
     "app/word_ui.py:42"
   ],
   "🧪 测试关键词": [
@@ -2680,7 +2680,7 @@
   ],
   "未知变体识别模式。": [
     "app/word_ui.py:111",
-    "app/store.py:608"
+    "app/store.py:610"
   ],
   "未知变体组合。": [
     "app/word_ui.py:116"
@@ -2699,7 +2699,7 @@
   ],
   "未知词库分类或模式。": [
     "app/word_ui.py:125",
-    "app/store.py:623"
+    "app/store.py:625"
   ],
   "未知组合。": [
     "app/word_ui.py:130"
@@ -2768,172 +2768,172 @@
     "app/store.py:21"
   ],
   "未知界面语言。": [
-    "app/store.py:391"
+    "app/store.py:393"
   ],
   "该群尚未加入机器人": [
-    "app/store.py:393",
-    "app/store.py:404"
+    "app/store.py:395",
+    "app/store.py:406"
   ],
   "未知设置": [
-    "app/store.py:419"
+    "app/store.py:421"
   ],
   "开关必须是布尔值": [
-    "app/store.py:422"
-  ],
-  "文本最多 1500 字": [
     "app/store.py:424"
   ],
-  "日志目标 ID 必须是负整数或 0": [
+  "文本最多 1500 字": [
     "app/store.py:426"
   ],
-  "验证时限为 60-1800 秒": [
+  "日志目标 ID 必须是负整数或 0": [
     "app/store.py:428"
   ],
+  "验证时限为 60-1800 秒": [
+    "app/store.py:430"
+  ],
   "签到基础积分需要在 1 到 100 之间": [
-    "app/store.py:431"
+    "app/store.py:433"
   ],
   "相同图片触发次数需要在 2 到 10 次之间": [
-    "app/store.py:434"
+    "app/store.py:436"
   ],
   "图片检测时间需要在 30 到 600 秒之间": [
-    "app/store.py:437"
-  ],
-  "OCR 模式只能是 off、review、delete": [
     "app/store.py:439"
   ],
-  "OCR 信心阈值范围为 40–95": [
-    "app/store.py:442"
+  "OCR 模式只能是 off、review、delete": [
+    "app/store.py:441"
   ],
-  "违禁词处罚只能为 delete 或 mute": [
+  "OCR 信心阈值范围为 40–95": [
     "app/store.py:444"
   ],
-  "变体识别模式只能为 off、observe、enforce": [
+  "违禁词处罚只能为 delete 或 mute": [
     "app/store.py:446"
   ],
-  "未知防刷屏处罚方式": [
+  "变体识别模式只能为 off、observe、enforce": [
     "app/store.py:448"
   ],
-  "跨账号检测模式只能为 off、observe、enforce": [
+  "未知防刷屏处罚方式": [
     "app/store.py:450"
   ],
+  "跨账号检测模式只能为 off、observe、enforce": [
+    "app/store.py:452"
+  ],
   "违禁词删除提醒只能为 0、10、30、60 秒": [
-    "app/store.py:453"
+    "app/store.py:455"
   ],
   "防刷屏删除提醒只能为 0、10、30、60 秒": [
-    "app/store.py:456"
+    "app/store.py:458"
   ],
   "未知类型": [
-    "app/store.py:470"
+    "app/store.py:472"
   ],
   "未知规则类型": [
-    "app/store.py:496"
+    "app/store.py:498"
   ],
   "只支持查看当前群的违禁词列表": [
-    "app/store.py:504"
-  ],
-  "列表页码无效": [
     "app/store.py:506"
   ],
-  "仅支持批量导入违禁词、域名或例外短语": [
-    "app/store.py:538"
+  "列表页码无效": [
+    "app/store.py:508"
   ],
-  "一次最多提交 80 条规则": [
+  "仅支持批量导入违禁词、域名或例外短语": [
     "app/store.py:540"
   ],
+  "一次最多提交 80 条规则": [
+    "app/store.py:542"
+  ],
   "未知防刷屏设置。": [
-    "app/store.py:589"
+    "app/store.py:591"
   ],
   "导入词条或匹配方式无效。": [
-    "app/store.py:654"
+    "app/store.py:656"
   ],
   "未知关键词匹配方式": [
-    "app/store.py:699",
+    "app/store.py:701",
     "app/moderation.py:50"
   ],
   "搜索词需为1–80字": [
-    "app/store.py:719"
+    "app/store.py:721"
   ],
   "未知群组": [
-    "app/store.py:739"
+    "app/store.py:741"
   ],
   "不支持的媒体类型": [
-    "app/store.py:771"
-  ],
-  "Telegram 文件 ID 无效": [
     "app/store.py:773"
   ],
-  "按钮格式无效": [
+  "Telegram 文件 ID 无效": [
     "app/store.py:775"
   ],
+  "按钮格式无效": [
+    "app/store.py:777"
+  ],
   "最多允许 3 个链接按钮": [
-    "app/store.py:780"
+    "app/store.py:782"
   ],
   "最多 100 条自动回复": [
-    "app/store.py:786"
+    "app/store.py:788"
   ],
   "未知审核状态": [
-    "app/store.py:845"
+    "app/store.py:847"
   ],
   "统计范围仅允许 1-31 天": [
-    "app/store.py:903"
+    "app/store.py:905"
   ],
   "排行榜范围无效": [
-    "app/store.py:922"
+    "app/store.py:924"
   ],
   "群组尚未登记": [
-    "app/store.py:941"
-  ],
-  "不支持的定时类型": [
     "app/store.py:943"
   ],
-  "标题最多 60 字，内容最多 3500 字，均不能为空": [
+  "不支持的定时类型": [
     "app/store.py:945"
   ],
+  "标题最多 60 字，内容最多 3500 字，均不能为空": [
+    "app/store.py:947"
+  ],
   "单群最多保存 20 条定时消息，可先删除旧任务": [
-    "app/store.py:950"
+    "app/store.py:952"
   ],
   "本群尚未开启签到积分": [
-    "app/store.py:1056"
+    "app/store.py:1058"
   ],
   "单次调整必须在 1 到 10000 积分之间": [
-    "app/store.py:1097"
+    "app/store.py:1099"
   ],
   "未命名群组": [
-    "app/store.py:369"
+    "app/store.py:371"
   ],
   "{p0} 的设置范围为 {p1}–{p2}": [
-    "app/store.py:460"
+    "app/store.py:462"
   ],
   "域名规则最多 300 条": [
-    "app/store.py:478"
+    "app/store.py:480"
   ],
   "防刷屏设置已变化，请重新预览。": [
-    "app/store.py:594"
+    "app/store.py:596"
   ],
   "词库或变体设置已变化，请重新预览。": [
-    "app/store.py:613"
+    "app/store.py:615"
   ],
   "词库已被修改，请重新预览。": [
-    "app/store.py:627",
-    "app/store.py:642"
+    "app/store.py:629",
+    "app/store.py:644"
   ],
   "词库已被修改，请重新导入预览。": [
-    "app/store.py:658"
+    "app/store.py:660"
   ],
   "关键词已被修改或删除，请重新查看。": [
-    "app/store.py:704"
+    "app/store.py:706"
   ],
   "恢复定时任务时必须重算下次发送时间": [
-    "app/store.py:981"
+    "app/store.py:983"
   ],
   "积分已达上限": [
-    "app/store.py:1072"
+    "app/store.py:1074"
   ],
   "调整失败：积分不能为负数，也不能超过上限": [
-    "app/store.py:1108"
+    "app/store.py:1110"
   ],
   "超过每群域名 300 条上限，本次没有导入任何规则": [
-    "app/store.py:549"
+    "app/store.py:551"
   ],
   "免费抽奖标题必须是 2–100 字": [
     "app/raffle.py:34"
@@ -3061,20 +3061,26 @@
   "拼音＋中文混写": [
     "app/variants.py:16"
   ],
+  "拼音缩写（上下文）": [
+    "app/variants.py:17"
+  ],
+  "同音字增强（上下文）": [
+    "app/variants.py:18"
+  ],
   "执行处罚": [
     "app/word_library.py:11"
   ],
   "命中 {p0}{p1}（{p2}）": [
-    "app/word_library.py:184"
+    "app/word_library.py:200"
   ],
   "未命中关键词": [
-    "app/word_library.py:180"
+    "app/word_library.py:196"
   ],
   " · 原规则匹配": [
-    "app/word_library.py:181"
+    "app/word_library.py:197"
   ],
   "总开关已关闭": [
-    "app/word_library.py:182"
+    "app/word_library.py:198"
   ],
   "开源广告扩展": [
     "app/word_library.py:43"
@@ -3092,7 +3098,7 @@
     "app/word_library.py:99"
   ],
   "按本群违禁词处罚": [
-    "app/word_library.py:183"
+    "app/word_library.py:199"
   ],
   "Apache-2.0公开词库，包含宽泛短词，误伤风险高；默认关闭，建议仅观察。不是私有机器人词库或实测命中率排名。": [
     "app/word_library.py:46"

@@ -3,7 +3,7 @@ from .i18n import msg as _ui, join_text
 import json
 import re
 import unicodedata
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from pathlib import Path
 
 from .keyword_matcher import Automaton
@@ -13,7 +13,9 @@ ROOT = Path(__file__).with_name("wordlists")
 VARIANT_SETTINGS = {"traditional": ("word_traditional_mode", _ui('繁简字形')),
                     "homophone": ("word_homophone_mode", _ui('定向同音／拼音')),
                     "split": ("word_short_split_mode", _ui('短词拆字增强')),
-                    "pinyin": ("word_mixed_pinyin_mode", _ui('拼音＋中文混写'))}
+                    "pinyin": ("word_mixed_pinyin_mode", _ui('拼音＋中文混写')),
+                    "initials": ("word_pinyin_initials_mode", _ui('拼音缩写（上下文）')),
+                    "phonetic": ("word_phonetic_mode", _ui('同音字增强（上下文）'))}
 _CLAUSES = re.compile(r"([\n\r。！？!?；;]+)")
 
 
@@ -106,6 +108,11 @@ class VariantIndex:
                         if mode == "contains" and len(dense) >= 2 and any(map(is_han, phrase))]
         self.engines = {}
         self.mixed_engines = {}
+        self.phonetic_engines = {}
+
+    @cached_property
+    def folds_rules(self):
+        return any(simplify(phrase) != phrase for _, phrase in self.entries)
 
     def engine(self, traditional=False, ocr=False):
         key = (traditional, ocr)
@@ -118,13 +125,20 @@ class VariantIndex:
         return self.engines[key]
 
     def find(self, text, *, traditional=False, ocr=False, context="", waived=(), excluded=(), pinyin=False,
-             pinyin_encoding=None):
+             pinyin_encoding=None, initials=False, homophones=False, phonetic_encoding=None):
+        traditional = traditional and self.folds_rules
+        if initials or homophones:
+            from .phonetic import PhoneticIndex
+            if traditional not in self.phonetic_engines:
+                self.phonetic_engines[traditional] = PhoneticIndex(self.entries, simplify if traditional else None)
+            return self.phonetic_engines[traditional].find(text, initials=initials, homophones=homophones, pinyin=pinyin,
+                context=context, waived=waived, excluded=excluded, ocr=ocr, prepared=phonetic_encoding)
         if pinyin:
             from .mixed_pinyin import MixedPinyinIndex
             if traditional not in self.mixed_engines:
                 self.mixed_engines[traditional] = MixedPinyinIndex(self.entries, simplify if traditional else None)
             return self.mixed_engines[traditional].find(text, context=context, waived=waived, excluded=excluded,
-                                                       ocr=ocr, encoding=pinyin_encoding)
+                                                       ocr=ocr, encoding=pinyin_encoding, prepared=phonetic_encoding)
         best = None
         for index, _ in self.engine(traditional, ocr).matches(text):
             original, phrase = self.entries[index]
@@ -139,16 +153,24 @@ class VariantIndex:
 
 def candidates(message, settings, *, ocr=False):
     active = [(key, settings.get(name, "off")) for key, (name, _) in VARIANT_SETTINGS.items()
-              if settings.get(name, "off") in ("observe", "enforce")]
+              if settings.get(name, "off") in ("observe", "enforce") and (not ocr or key not in ("initials", "phonetic"))]
     if not active:
         return
     parts = [normalize(message.get("text") or message.get("caption") or "")]
     parts += [normalize(b.get("text") or "") for row in (message.get("reply_markup") or {}).get("inline_keyboard", [])
               for b in row if isinstance(b, dict)]
     context = normalize(join_text('\n', parts))
+    # Skip expensive ambiguous features unless a part has an independent cue.
+    if any(key in ("initials", "phonetic") for key, _ in active):
+        from .phonetic import has_solicitation
+        if not any(has_solicitation(part) for part in parts):
+            active = [(key, mode) for key, mode in active if key not in ("initials", "phonetic")]
     choices = []
     for mask in range(1, 1 << len(active)):
         features = {key for i, (key, _) in enumerate(active) if mask & (1 << i)}
+        # Initials include syllable/initial mixtures, so this pair is redundant.
+        if {"pinyin", "initials"} <= features:
+            continue
         observe = any(mode == "observe" for i, (_, mode) in enumerate(active) if mask & (1 << i))
         choices.append((features, observe))
     choices.sort(key=lambda row: (row[1], len(row[0])))
@@ -179,14 +201,18 @@ def candidates(message, settings, *, ocr=False):
                 text = result
             rewritten.append(text)
         if not features <= changed:
-            if "pinyin" in features:
+            if features & {"pinyin", "initials"}:
                 from .mixed_pinyin import latin_letter
-                if any(any(map(is_han, part)) and any(latin_letter(c) for c in part) for part in rewritten):
-                    changed.add("pinyin")
+                if any(any(latin_letter(c) for c in part) and ("initials" in features or any(map(is_han, part)))
+                       for part in rewritten):
+                    changed.update(features & {"pinyin", "initials"})
+            if "phonetic" in features and any(any(map(is_han, part)) for part in rewritten):
+                changed.add("phonetic")
             if not features <= changed:
                 continue
         kind = join_text('／', (label for key, (_, label) in VARIANT_SETTINGS.items() if key in features))
-        yield rewritten, "traditional" in features, observe, kind, context, "pinyin" in features
+        yield (rewritten, "traditional" in features, observe, kind, context,
+               "pinyin" in features, "initials" in features, "phonetic" in features)
 
 
 def context_matches(word, text, settings):
@@ -195,8 +221,8 @@ def context_matches(word, text, settings):
         return True
     from .moderation import compile_words
     index = VariantIndex(compile_words([word]).rules)
-    return any(index.find(part, traditional=traditional, context=context, pinyin=pinyin)
-               for parts, traditional, _, _, context, pinyin in candidates({"text": text}, settings)
+    return any(index.find(part, traditional=traditional, context=context, pinyin=pinyin, initials=initials, homophones=homophones)
+               for parts, traditional, _, _, context, pinyin, initials, homophones in candidates({"text": text}, settings)
                for part in parts)
 
 

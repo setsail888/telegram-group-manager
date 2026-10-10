@@ -7,5 +7,9 @@
   "characters": 41923,
   "generated_sha256": "e89416deba28fc74bced6fd6bc096e5530aa4341062d1f2f70eafcfd6ef2bec1",
   "license_sha256": "1e6c90014b4912815c296ee64bb6f6280af47e6d4c5d80e86232dfc5defe764c",
-  "conversion": "First listed character reading; lowercase, no tone, u-diaeresis as v. No phrase model."
+  "polyphones": 6986,
+  "phrase_corrections": 3437,
+  "polyphones_sha256": "bc8fdba9b982bf338e9fb81065d08348ac0913ad548cb9103b17224ee07060d8",
+  "phrases_sha256": "0c3172b0903c018a6e8f86f398956ff5a8ffc22624a44bd0490fd58a728d3ae3",
+  "conversion": "Lowercase, toneless, u-diaeresis as v. Primary table plus distinct character readings and longest-match phrase corrections. Homophones use preferred readings only."
 }

@@ -32,14 +32,14 @@ class WordUI:
 
     def variants(self, cid):
         modes, b = self.bot.store.variant_modes(cid), self.bot._button
-        text = (_ui('🈶 中文变体识别\n只增强已添加或已启用分类中的「包含」规则；整词、整句规则保持原精度。\n繁简字形：賭博→赌博、刷單→刷单（字表转换，不是完整语义转换）。\n定向同音／拼音：唰单／shuadan→刷单；菠菜需同句附近有平台、投注等提示词。不是任意同音字通杀。\n短词拆字增强：刷⭐单→刷单，允许1–3个间隔符，不跨换行或按钮；可能误伤正常引用。\n拼音＋中文混写：shua单返佣、刷dan返yong→刷单返佣；只扩展至少两个汉字的包含词，不做首字母缩写或纯拼音通杀。\n四项默认关闭；组合命中时，所需功能或分类任一为观察，就仅观察。总开关和全局观察优先。\n先在分类词库选择「两字短词（严格）」或添加自定义词，再测试并观察。\n\n')
+        text = (_ui('🈶 中文变体识别\n只增强已添加或已启用分类的「包含」规则；整词、整句保持原精度。\n繁简字形：刷單→刷单；固定字表转换。\n定向同音／拼音：唰单／shuadan→刷单；沿用指定别名及其上下文。\n短词拆字增强：刷⭐单→刷单，允许1–3个间隔符，不跨换行或按钮。\n拼音＋中文混写：shua单返yong、地下银hang；支持多音字的完整读音，保留原汉字。\n拼音缩写（上下文）：sdfy、刷d返y，需同句两侧24字内有日结、加我等招揽提示；纯缩写至少对应四个汉字，两三字需原汉字及专用提示。\n同音字增强（上下文）：刷单返拥，需附近招揽提示及足够原字；四至七字最多换一字，八字起最多两字；短词需专用提示。使用词组优先读音，不泛化生僻读音。\n新增缩写/同音增强避开代码、链接、账号、常见技术缩写和部分反诈引用；仍可能误判或漏判。不用于OCR自动删除；现有包含词和定向别名保持原行为。\n六项默认关闭；组合所需功能或分类任一观察，就仅观察。总开关和全局观察优先。\n先启用基础词，测试正常聊天，再切换处罚。\n\n')
                 + join_text('\n', (_ui('{p0}：{p1}', p0=label, p1=PACK_MODES[modes[key]]) for key, (_, label) in VARIANT_SETTINGS.items())))
         kb = []
         for key, (_, label) in VARIANT_SETTINGS.items():
             kb.append([b(_ui('{p0} · 当前{p1}', p0=label, p1=PACK_MODES[modes[key]]), _ui('v:{p0}:wordvariants', p0=cid))])
             kb.append([b(("✅ " if modes[key] == mode else "") + mode_label, _ui('ad:{p0}:variantmode:{p1}_{p2}', p0=cid, p1=key, p2=mode))
                        for mode, mode_label in PACK_MODES.items()])
-        kb += [[b(_ui('🧪 四项全部先观察'), _ui('ad:{p0}:variantpreset:observe', p0=cid))],
+        kb += [[b(_ui('🧪 六项全部先观察'), _ui('ad:{p0}:variantpreset:observe', p0=cid))],
                [b(_ui('🧪 测试关键词'), _ui('w:{p0}:test', p0=cid))],
                [b(_ui('📚 分类词库'), _ui('v:{p0}:wordpacks', p0=cid))]] + self.bot.admin_ui.back(cid, "words")
         return text, kb

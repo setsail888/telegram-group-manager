@@ -1,4 +1,4 @@
-"""Bounded Chinese + full-pinyin matching, without general homophone folding."""
+"""Fast primary-reading scan with a lazy token-trie fallback for polyphones."""
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -12,6 +12,7 @@ def readings():
     return json.loads((Path(__file__).with_name("wordlists") / "pinyin-characters.json").read_text(encoding="utf-8"))
 
 
+@lru_cache(maxsize=4096)
 def latin_letter(char):
     value = unicodedata.normalize("NFD", char.lower()).replace("u\u0308", "v")
     value = "".join(c for c in value if not unicodedata.combining(c))
@@ -44,6 +45,8 @@ def encoded(text):
 
 class MixedPinyinIndex:
     def __init__(self, entries, simplify=None):
+        self.entries, self.simplify, self.polyphonic = entries, simplify, None
+        self.order = {original: i for i, (original, _) in enumerate(entries)}
         self.rules = {}
         patterns = []
         table = readings()
@@ -65,7 +68,19 @@ class MixedPinyinIndex:
             self.rules[index] = (original, raw_phrase, pattern, slots)
         self.matcher = Automaton(patterns)
 
-    def find(self, text, *, context="", waived=(), excluded=(), ocr=False, encoding=None):
+    def find(self, text, *, context="", waived=(), excluded=(), ocr=False, encoding=None, prepared=None):
+        result = self._primary_find(text, context=context, waived=waived, excluded=excluded, ocr=ocr, encoding=encoding)
+        if (result is not None and self.order[result] == 0
+                or not any(c in readings() for c in text) or not any(latin_letter(c) for c in text)):
+            return result
+        from .phonetic import PhoneticIndex
+        if self.polyphonic is None:
+            self.polyphonic = PhoneticIndex(self.entries, self.simplify, polyphonic_only=True)
+        return self.polyphonic.find(text, pinyin=True, context=context, waived=waived, excluded=excluded, ocr=ocr,
+                                    before=self.order[result] if result is not None else None,
+                                    prepared=prepared() if callable(prepared) else prepared) or result
+
+    def _primary_find(self, text, *, context="", waived=(), excluded=(), ocr=False, encoding=None):
         spelling, offsets, starts, ends = encoding if encoding is not None else encoded(text)
         best = None
         table = readings()
@@ -83,6 +98,9 @@ class MixedPinyinIndex:
                     or b < len(text) and (latin_letter(text[b]) or text[b] == "_" or text[b].isascii() and text[b].isalnum())):
                 continue
             span = text[a:b]
+            from .phonetic import _PROTECTED
+            if any(a < m.end() and b > m.start() for m in _PROTECTED.finditer(text)):
+                continue
             if not any(c in table for c in span) or not any(latin_letter(c) for c in span):
                 continue
             valid = True

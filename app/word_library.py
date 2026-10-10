@@ -125,7 +125,9 @@ class WordPolicy:
         observed = None
         # Share encoding across packs within this call, without retaining message text.
         encodings = {}
-        for parts, traditional, observe, kind, context, pinyin in candidates(message, settings, ocr=ocr):
+        phonetic_encodings = {}
+        results = {}
+        for parts, traditional, observe, kind, context, pinyin, initials, homophones in candidates(message, settings, ocr=ocr):
             # OCR waivers use the same compact comparison as the OCR base matcher.
             waived = self.exceptions
             if ocr:
@@ -136,15 +138,29 @@ class WordPolicy:
                                                   for p, mode in self.packs]
             for source, pack_id, pack_observe, excluded in sources:
                 for part in parts:
-                    encoding = None
-                    if pinyin:
+                    index = source.variant_rules
+                    folded = traditional and index.folds_rules
+                    key = (id(index), part, folded, pinyin, initials, homophones)
+                    encoding = phonetic_encoding = None
+                    def prepare_part(part=part):
+                        from .phonetic import prepare
+                        if part not in phonetic_encodings:
+                            phonetic_encodings[part] = prepare(part)
+                        return phonetic_encodings[part]
+                    if initials or homophones:
+                        phonetic_encoding = prepare_part()
+                    elif pinyin:
                         from .mixed_pinyin import encoded
                         if part not in encodings:
                             encodings[part] = encoded(part)
                         encoding = encodings[part]
-                    word = source.variant_rules.find(part, traditional=traditional, ocr=ocr,
-                                                     context=context, waived=waived, excluded=excluded, pinyin=pinyin,
-                                                     pinyin_encoding=encoding)
+                        phonetic_encoding = prepare_part  # Only prepare if the fast scan needs its fallback.
+                    if key not in results:
+                        results[key] = index.find(part, traditional=folded, ocr=ocr,
+                                                 context=context, waived=waived, excluded=excluded, pinyin=pinyin,
+                                                 pinyin_encoding=encoding, initials=initials, homophones=homophones,
+                                                 phonetic_encoding=phonetic_encoding)
+                    word = results[key]
                     if word is None:
                         continue
                     hit = {"word": word, "pack": pack_id, "observe": observe or pack_observe, "match_kind": kind}
