@@ -23,12 +23,42 @@ DEFAULTS = {
     "repeat_photo_enabled": False,
     "repeat_photo_limit": 3,
     "repeat_photo_window": 60,
+    "spam_guard_enabled": False,
+    "word_loose_match": False,
+    "flood_limit": 7,
+    "flood_window": 10,
+    "repeat_limit": 3,
+    "repeat_window": 45,
+    "media_flood_limit": 5,
+    "media_flood_window": 20,
+    "media_flood_enabled": False,
+    "mention_limit": 5,
+    "auto_mute_enabled": False,
+    "auto_mute_after": 3,
+    "auto_mute_minutes": 30,
+    "name_guard_enabled": False,
+    "name_length_limit": 40,
     "ocr_mode": "off",
     "ocr_confidence": 75,
 }
 TOGGLES = {"block_links", "block_forward", "anti_flood", "welcome_enabled",
            "verify_enabled", "block_new_bots", "points_enabled",
-           "repeat_photo_enabled"}
+           "repeat_photo_enabled", "spam_guard_enabled",
+           "word_loose_match", "auto_mute_enabled", "media_flood_enabled",
+           "name_guard_enabled"}
+
+NUMBER_LIMITS = {
+    "flood_limit": (3, 30),
+    "flood_window": (3, 120),
+    "repeat_limit": (2, 10),
+    "repeat_window": (10, 300),
+    "media_flood_limit": (2, 30),
+    "media_flood_window": (5, 120),
+    "mention_limit": (3, 20),
+    "auto_mute_after": (2, 10),
+    "auto_mute_minutes": (1, 1440),
+    "name_length_limit": (20, 100),
+}
 
 
 class Store:
@@ -67,6 +97,16 @@ class Store:
               count INTEGER NOT NULL DEFAULT 0,
               PRIMARY KEY(chat_id, user_id)
             );
+            CREATE TABLE IF NOT EXISTS moderation_events (
+              chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL,
+              user_id INTEGER NOT NULL, reason TEXT NOT NULL,
+              created_at INTEGER NOT NULL,
+              PRIMARY KEY(chat_id,message_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_moderation_events_user
+              ON moderation_events(chat_id,user_id,created_at);
+            CREATE INDEX IF NOT EXISTS idx_moderation_events_prune
+              ON moderation_events(created_at);
             CREATE TABLE IF NOT EXISTS pending (
               chat_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
               nonce TEXT NOT NULL, answer INTEGER NOT NULL,
@@ -242,17 +282,24 @@ class Store:
         if name == "ocr_confidence" and (
             type(value) is not int or not 40 <= value <= 95):
             raise ValueError("OCR 信心阈值范围为 40–95")
+        if name in NUMBER_LIMITS:
+            lo, hi = NUMBER_LIMITS[name]
+            if type(value) is not int or not lo <= value <= hi:
+                raise ValueError(f"{name} 的设置范围为 {lo}–{hi}")
         settings[name] = value
         self.db.execute("UPDATE chats SET settings=?,updated_at=? WHERE chat_id=?",
                         (json.dumps(settings, ensure_ascii=False), int(time.time()), int(chat_id)))
         return settings
 
     def add_filter(self, chat_id, kind, key, value):
-        if kind not in ("word", "domain"):
+        if kind not in ("word", "domain", "word_exception"):
             raise ValueError("未知类型")
         count = self.db.execute("SELECT COUNT(*) FROM filters WHERE chat_id=? AND kind=?",
                                 (int(chat_id), kind)).fetchone()[0]
-        if count >= 300:
+        exists = self.db.execute(
+            "SELECT 1 FROM filters WHERE chat_id=? AND kind=? AND key=?",
+            (int(chat_id), kind, str(key))).fetchone()
+        if count >= 300 and not exists:
             raise ValueError("每类规则最多 300 条")
         self.db.execute("INSERT OR REPLACE INTO filters VALUES (?,?,?,?)",
                         (int(chat_id), kind, str(key), str(value)))
@@ -266,6 +313,54 @@ class Store:
         return [dict(row) for row in self.db.execute(
             "SELECT key,value FROM filters WHERE chat_id=? AND kind=? ORDER BY key",
             (int(chat_id), kind))]
+
+    def add_filters_bulk(self, chat_id, kind, entries):
+        """All-or-nothing import. Same-group, existing rules may be replaced."""
+        if kind not in ("word", "word_exception"):
+            raise ValueError("仅支持批量导入违禁词或例外短语")
+        if not entries or len(entries) > 80:
+            raise ValueError("一次最多提交 80 条规则")
+        unique = {str(key): str(value) for key, value in entries}
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            existing = {r[0] for r in self.db.execute(
+                "SELECT key FROM filters WHERE chat_id=? AND kind=?",
+                (int(chat_id), kind))}
+            if len(existing | set(unique)) > 300:
+                raise ValueError("超过每群每类 300 条上限，本次没有导入任何规则")
+            for key, value in unique.items():
+                self.db.execute("INSERT OR REPLACE INTO filters VALUES (?,?,?,?)",
+                                (int(chat_id), kind, key, value))
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        return len(unique)
+
+    def record_moderation(self, chat_id, user_id, message_id, reason, now=None,
+                          window=600):
+        """Count distinct successfully deleted messages for opt-in escalation."""
+        moment = int(time.time() if now is None else now)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            created = bool(self.db.execute(
+                "INSERT OR IGNORE INTO moderation_events "
+                "(chat_id,message_id,user_id,reason,created_at) VALUES(?,?,?,?,?)",
+                (int(chat_id), int(message_id), int(user_id), str(reason)[:75],
+                 moment)).rowcount)
+            recent = self.db.execute(
+                "SELECT count(*) FROM moderation_events "
+                "WHERE chat_id=? AND user_id=? AND created_at>=?",
+                (int(chat_id), int(user_id), moment - int(window))).fetchone()[0]
+            # Avoid retaining moderation histories forever.
+            self.db.execute(
+                "DELETE FROM moderation_events WHERE created_at<?",
+                (moment - 86400 * 7,))
+            self.db.execute("COMMIT")
+            return {"created": created, "recent": recent}
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
 
     def add_reply(self, chat_id, key, keyword, reply,
                   buttons=None, media_type=None, media_id=None):

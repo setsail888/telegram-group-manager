@@ -1,7 +1,8 @@
 """Human-readable group commands with authorization on every mutation."""
+import re
 import time
 
-from .moderation import normalize, normalize_domain
+from .moderation import normalize, normalize_domain, match_words
 from .economy_commands import (
     MEMBER_COMMANDS as ECONOMY_MEMBER_COMMANDS,
     ADMIN_COMMANDS as ECONOMY_ADMIN_COMMANDS,
@@ -14,13 +15,18 @@ from .points import (ADMIN_COMMANDS as POINT_ADMIN_COMMANDS,
                      handle_member_command as handle_points_member)
 from .reply_rules import media_from_reply, parse_buttons, parse_keywords
 from .scheduler import format_run, next_occurrence, parse_new_schedule
-from .store import TOGGLES
+from .store import TOGGLES, NUMBER_LIMITS
 
 SWITCHES = {
     "links": "block_links", "forward": "block_forward",
     "flood": "anti_flood", "captcha": "verify_enabled",
     "welcome": "welcome_enabled", "bots": "block_new_bots",
     "imageflood": "repeat_photo_enabled",
+    "spam": "spam_guard_enabled",
+    "mediaflood": "media_flood_enabled",
+    "wordloose": "word_loose_match",
+    "automute": "auto_mute_enabled",
+    "nameguard": "name_guard_enabled",
 }
 ADMIN_ONLY = {
     "panel", "settings", "check", "id", "stats", "statweek", "top7",
@@ -29,6 +35,9 @@ ADMIN_ONLY = {
     "setrules", "setwelcome", "addreply", "delreply", "replies", "setlog",
     "warn", "unwarn", "mute", "unmute", "ban", "unban", "kick", "dban",
     "imageflood", "imagelimit", "imagewindow", "ocr", "ocrconfidence",
+    "spam", "mediaflood", "wordloose", "automute", "nameguard",
+    "guard", "guardset", "addwords", "delwords",
+    "wordtest", "wordexcept", "delwordexcept",
 } | POINT_ADMIN_COMMANDS | ECONOMY_ADMIN_COMMANDS
 COMMANDS = ADMIN_ONLY | POINT_MEMBER_COMMANDS | ECONOMY_MEMBER_COMMANDS | {"help", "rules"}
 
@@ -47,12 +56,14 @@ def _toggle(bot, chat_id, cmd, argument):
         return
     turn_on = argument.lower() == "on"
     if turn_on:
-        if cmd in ("captcha", "bots") and not bot.is_supergroup(chat_id):
+        if cmd in ("captcha", "bots", "automute", "nameguard") and not bot.is_supergroup(chat_id):
             bot.send(chat_id, "⚠️ 本功能仅支持 Telegram 超级群组。")
             return
-        permission = ("can_restrict_members" if cmd in ("captcha", "bots")
+        permission = ("can_restrict_members" if cmd in ("captcha", "bots", "automute",
+                                                        "nameguard")
                       else "can_delete_messages" if cmd in (
-                          "links", "forward", "flood", "imageflood") else None)
+                          "links", "forward", "flood", "imageflood",
+                          "spam", "mediaflood", "wordloose") else None)
         if permission and _deny_if_missing(bot, chat_id, permission, "启用该功能"):
             return
     bot.store.set(chat_id, setting, turn_on)
@@ -250,7 +261,7 @@ def handle_command(bot, message):
             bot.send(chat_id, f"⚙️ 私聊 @{bot.username}，发送 /start 打开管理面板。")
         elif command == "settings":
             state = "\n".join(f"{key}: {'开' if settings[key] else '关'}"
-                              for key in TOGGLES)
+                              for key in sorted(TOGGLES))
             bot.send(chat_id, f"⚙️ 本群设置\n{state}\n日志目标：{settings['log_chat_id'] or '关闭'}")
         elif command == "check":
             bot.send(chat_id, "🛡️ 权限检测\n"
@@ -317,6 +328,69 @@ def handle_command(bot, message):
                 raise ValueError("用法：/imagewindow 60（30-600 秒）") from None
             bot.store.set(chat_id, "repeat_photo_window", seconds)
             bot.send(chat_id, f"✅ 图片检测时间窗口设为 {seconds} 秒。")
+        elif command == "guard":
+            conf = bot.store.settings(chat_id)
+            bot.send(chat_id, "🛡️ 防护高级设置\n"
+                     f"/spam on|off 智能反垃圾：{conf['spam_guard_enabled']}\n"
+                     f"/wordloose on|off 拆字识别：{conf['word_loose_match']}\n"
+                     f"/mediaflood on|off 媒体连发：{conf['media_flood_enabled']}\n"
+                     f"/automute on|off 自动禁言：{conf['auto_mute_enabled']}\n"
+                     f"/nameguard on|off 超长昵称限制：{conf['name_guard_enabled']}\n"
+                     "调整阈值：/guardset flood_limit 7\n"
+                     "推荐在私聊 /start 的双列管理面板点击调整。")
+        elif command == "guardset":
+            name, sep, raw = argument.partition(" ")
+            if name not in NUMBER_LIMITS or not sep:
+                raise ValueError("用法：/guardset flood_limit 7（其他项见私聊管理面板）")
+            try:
+                value = int(raw.strip())
+            except ValueError:
+                raise ValueError("设置值必须为整数") from None
+            bot.store.set(chat_id, name, value)
+            bot.send(chat_id, f"✅ {name} 已设为 {value}。")
+            bot.log(chat_id, f"修改防护阈值 {name}={value}", actor=user_id)
+        elif command in ("addwords", "delwords"):
+            labels = [v.strip() for v in re.split(r"[,，、;\n]+", argument) if v.strip()]
+            if not 1 <= len(labels) <= 80:
+                raise ValueError("请用逗号/换行分隔违禁词，每次 1–80 条")
+            pairs = []
+            for value in labels:
+                key = normalize(value)
+                if not 2 <= len(key) <= 80:
+                    raise ValueError("每条违禁词需为 2–80 个字符；没有保存任何内容")
+                pairs.append((key, value))
+            if command == "addwords":
+                changed = bot.store.add_filters_bulk(chat_id, "word", pairs)
+            else:
+                changed = sum(bot.store.del_filter(chat_id, "word", k)
+                              for k in set(key for key, _value in pairs))
+            bot.send(chat_id, f"✅ 已{'导入' if command == 'addwords' else '删除'} {changed} 条违禁词。")
+            bot.log(chat_id, f"批量{'导入' if command == 'addwords' else '删除'}违禁词 {changed} 条",
+                    actor=user_id)
+        elif command == "wordtest":
+            if not 2 <= len(argument) <= 1000:
+                raise ValueError("用法：/wordtest 测试文字（2–1000字，不会删除）")
+            found = match_words(
+                argument, [r["key"] for r in bot.store.filters(chat_id, "word")],
+                loose=settings["word_loose_match"],
+                exceptions=[r["key"] for r in
+                            bot.store.filters(chat_id, "word_exception")])
+            bot.send(chat_id, "🧪 违禁词测试（不处罚）："
+                     + (f"命中 {str(found)[:75]}" if found else "未命中关键词"))
+        elif command in ("wordexcept", "delwordexcept"):
+            phrase, sep, context = argument.partition("|")
+            keyword, context = normalize(phrase.strip()), normalize(context.strip())
+            if not sep or not 2 <= len(keyword) <= 80 or not 3 <= len(context) <= 200:
+                raise ValueError(f"用法：/{command} 违禁词 | 完整允许文本")
+            if keyword not in context and command == "wordexcept":
+                raise ValueError("允许文本必须包含对应违禁词，才能避免错误配置")
+            key = f"{keyword}|{context}"
+            if command == "wordexcept":
+                bot.store.add_filter(chat_id, "word_exception", key, key)
+            else:
+                bot.store.del_filter(chat_id, "word_exception", key)
+            bot.send(chat_id, "✅ 定向例外已更新：只有完整匹配的消息豁免该违禁词。")
+            bot.log(chat_id, "修改违禁词定向例外", actor=user_id)
         elif command in SWITCHES:
             _toggle(bot, chat_id, command, argument)
         elif command in ("addword", "delword"):

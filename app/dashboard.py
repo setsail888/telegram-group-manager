@@ -155,6 +155,11 @@ def render_group(db, chat_id, tz):
     columns = [
         ("block_links", "链接过滤"), ("anti_flood", "刷屏过滤"),
         ("repeat_photo_enabled", "重复图片检测"),
+        ("spam_guard_enabled", "增强反垃圾"),
+        ("word_loose_match", "拆字违禁词"),
+        ("media_flood_enabled", "媒体连发拦截"),
+        ("auto_mute_enabled", "累计违规禁言"),
+        ("name_guard_enabled", "新人超长昵称限制"),
         ("ocr_mode", "OCR 图片文字审核"),
         ("verify_enabled", "新人验证"),
         ("points_enabled", "签到积分"), ("block_new_bots", "新机器人拦截"),

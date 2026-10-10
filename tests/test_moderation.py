@@ -2,7 +2,7 @@ import unittest
 
 from app.moderation import (
     FloodGuard, PhotoRepeatGuard, allowed, evaluate, extract_domains,
-    normalize, normalize_domain)
+    normalize, normalize_domain, compact, match_words)
 
 
 class ModerationTests(unittest.TestCase):
@@ -70,6 +70,76 @@ class ModerationTests(unittest.TestCase):
                 "from": {"id": 7}, "chat": {"id": -100}}
         for _ in range(5):
             self.assertIsNone(guard.check(item))
+
+    def test_loosely_split_word_requires_explicit_opt_in(self):
+        msg = {"text": "请加-微-信-联系"}
+        self.assertIsNone(evaluate(msg, {**self.defaults, "block_links": False},
+                                   ["加微信联系"], []))
+        self.assertEqual(evaluate(
+            msg, {**self.defaults, "block_links": False, "word_loose_match": True},
+            ["加微信联系"], []), "违禁词")
+        self.assertEqual(compact("Ｖ．Ｉ．Ｐ"), "vip")
+        # Common two-character phrases are intentionally not loose-matched.
+        self.assertIsNone(match_words("可-爱", ["可爱"], loose=True))
+
+    def test_word_exception_only_waives_own_keyword_and_exact_message(self):
+        self.assertIsNone(match_words(
+            "学校广告设计", ["广告"], exceptions=["广告|学校广告设计"]))
+        self.assertEqual(match_words(
+            "学校广告设计 私聊加微信", ["广告"],
+            exceptions=["广告|学校广告设计"]), "广告")
+        self.assertEqual(match_words(
+            "学校广告设计", ["广告", "学校"],
+            exceptions=["广告|学校广告设计"]), "学校")
+
+    def test_common_obfuscated_telegram_urls_opt_in(self):
+        base = {**self.defaults, "spam_guard_enabled": True}
+        self.assertEqual(evaluate({"text": "访问 t[.]me/abc"}, base, [], []),
+                         "伪装链接")
+        self.assertEqual(evaluate({"text": "访问 t . me/abc"}, base, [], []),
+                         "伪装链接")
+        self.assertIsNone(evaluate(
+            {"text": "访问 t[.]me/abc"}, {**base, "spam_guard_enabled": False}, [], []))
+        self.assertIsNone(evaluate(
+            {"text": "访问 t[.]me/abc"}, {**base, "block_links": False}, [], []))
+
+    def test_bulk_mentions_opt_in_and_configurable(self):
+        content = " ".join(f"@person{i:02d}" for i in range(7))
+        self.assertEqual(evaluate(
+            {"text": content},
+            {**self.defaults, "block_links": False, "spam_guard_enabled": True,
+             "mention_limit": 5}, [], []), "批量提及刷屏")
+        self.assertIsNone(evaluate(
+            {"text": content},
+            {**self.defaults, "block_links": False, "spam_guard_enabled": False},
+            [], []))
+
+    def test_media_storm_can_be_enabled_without_impacting_other_senders(self):
+        guard = FloodGuard()
+        conf = {**self.defaults, "block_links": False, "anti_flood": True,
+                "flood_limit": 15, "flood_window": 30,
+                "media_flood_enabled": True, "media_flood_limit": 2,
+                "media_flood_window": 20}
+        for i in range(2):
+            item = {"chat": {"id": -100}, "from": {"id": 8},
+                    "photo": [{"file_unique_id": str(i)}]}
+            self.assertIsNone(evaluate(item, conf, [], [], guard))
+        item = {"chat": {"id": -100}, "from": {"id": 8},
+                "sticker": {"file_unique_id": "stamp"}}
+        self.assertEqual(evaluate(item, conf, [], [], guard), "媒体刷屏")
+        self.assertIsNone(evaluate(
+            {**item, "from": {"id": 9}}, conf, [], [], guard))
+
+    def test_edits_do_not_increase_flood_counters(self):
+        guard = FloodGuard(limit=2, window=60, repeat_limit=5)
+        msg = {"chat": {"id": -100}, "from": {"id": 8}, "text": "安全消息"}
+        self.assertIsNone(evaluate(msg, {**self.defaults, "anti_flood": True,
+                                          "flood_limit": 2, "flood_window": 60},
+                                   [], [], guard))
+        for _ in range(10):
+            self.assertIsNone(evaluate(msg, {**self.defaults, "anti_flood": True},
+                                       [], [], guard, is_edit=True))
+        self.assertEqual(len(guard.records[(-100, 8)]), 1)
 
 
 if __name__ == "__main__":

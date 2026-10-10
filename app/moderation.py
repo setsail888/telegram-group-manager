@@ -12,12 +12,63 @@ _LINK = re.compile(
     r"(?::\d{1,5})?(?:/[^\s<>]*)?",
     flags=re.IGNORECASE)
 _ZERO_WIDTH = {"\u200b", "\u200c", "\u200d", "\ufeff", "\u2060", "\u034f"}
+_MENTION = re.compile(r"(?<![\w@])@[a-zA-Z][a-zA-Z0-9_]{4,31}\b")
+_OBFUSCATED_URL = re.compile(
+    r"(?i)(?<![\w])(?:t|telegram|www)\s*(?:\[\s*\.\s*\]|\(\s*\.\s*\)|．|\s+\.\s*|\s*\.\s+)\s*(?:me|com|net|org)\b"
+    r"|(?i:(?<![\w])hxxps?://[^\s]+)")
 
 
 def normalize(value):
     value = unicodedata.normalize("NFKC", str(value)).casefold()
     return "".join(c for c in value if c not in _ZERO_WIDTH
                    and unicodedata.category(c) not in ("Cf",)).strip()
+
+
+def compact(value):
+    """Opt-in detection of deliberately split keyword characters (not default)."""
+    value = normalize(value)
+    return "".join(c for c in value if not unicodedata.category(c).startswith(
+        ("P", "Z")) and not c.isspace())
+
+
+def match_words(text, banned_words, *, loose=False, exceptions=()):
+    """Return the matching banned word; exceptions only waive their own rule."""
+    clean = normalize(text)
+    dense = compact(clean) if loose else ""
+    for word in banned_words:
+        phrase = normalize(word)
+        if not phrase:
+            continue
+        basic = phrase in clean
+        dense_keyword = compact(phrase)
+        # Loose mode is opt-in and requires enough characters to reduce
+        # false positives on short, common Chinese/English substrings.
+        allowed_loose = len(dense_keyword) >= (3 if any(
+            "\u3400" <= c <= "\u9fff" for c in dense_keyword) else 4)
+        found = basic or (loose and allowed_loose and dense_keyword in dense)
+        if not found:
+            continue
+        exception_match = False
+        for rule in exceptions:
+            prefix, sep, context = str(rule).partition("|")
+            if not sep or normalize(prefix) != phrase:
+                continue
+            # Waive only this exact preapproved phrase, never a longer spam
+            # message with the allowlisted phrase appended to evade filters.
+            if normalize(context) and normalize(context) == clean:
+                exception_match = True
+                break
+        if not exception_match:
+            return word
+    return None
+
+
+def media_kind(message):
+    for kind in ("photo", "video", "animation", "document", "sticker",
+                 "voice", "video_note", "audio"):
+        if message.get(kind):
+            return kind
+    return None
 
 
 def normalize_domain(value):
@@ -67,25 +118,39 @@ class FloodGuard:
         self.records = defaultdict(deque)
         self.last_housekeeping = 0
 
-    def check(self, chat_id, user_id, text, now=None):
+    def check(self, chat_id, user_id, text, now=None, *,
+              limit=None, window=None, repeat_limit=None, repeat_window=None,
+              media=None, media_limit=5, media_window=20, loose=False):
         now = time.monotonic() if now is None else now
         key = (chat_id, user_id)
         recent = self.records[key]
-        while recent and now - recent[0][0] > max(self.window, self.repeat_window):
+        limit = self.limit if limit is None else limit
+        window = self.window if window is None else window
+        repeat_limit = self.repeat_limit if repeat_limit is None else repeat_limit
+        repeat_window = self.repeat_window if repeat_window is None else repeat_window
+        while recent and now - recent[0][0] > max(window, repeat_window, media_window):
             recent.popleft()
-        normalized = normalize(text)[:256]
-        recent.append((now, normalized))
-        too_many = sum(now - tick <= self.window for tick, _ in recent) > self.limit
+        normalized = (compact(text) if loose else normalize(text))[:256]
+        recent.append((now, normalized, media))
+        # Bound a single very active member's history as well as the number
+        # of tracked members; configured thresholds never exceed 30/300 sec.
+        while len(recent) > 512:
+            recent.popleft()
+        too_many = sum(now - tick <= window for tick, _, _ in recent) > limit
         repeated = bool(normalized) and sum(
-            now - tick <= self.repeat_window and value == normalized
-            for tick, value in recent) >= self.repeat_limit
+            now - tick <= repeat_window and value == normalized
+            for tick, value, _ in recent) >= repeat_limit
+        media_burst = bool(media) and sum(
+            now - tick <= media_window and kind is not None
+            for tick, _, kind in recent) > media_limit
         # Bound memory for large communities; purge inactive users.
         if len(self.records) > 15000 and now - self.last_housekeeping > 60:
             self.last_housekeeping = now
             for old_key in list(self.records):
                 if not self.records[old_key] or now - self.records[old_key][-1][0] > 60:
                     del self.records[old_key]
-        return "短时刷屏" if too_many else ("重复刷屏" if repeated else None)
+        return ("短时刷屏" if too_many else "媒体刷屏" if media_burst
+                else "重复刷屏" if repeated else None)
 
 
 class PhotoRepeatGuard:
@@ -124,13 +189,14 @@ class PhotoRepeatGuard:
         return None
 
 
-def evaluate(message, settings, banned_words, allowed_domains, flood=None):
+def evaluate(message, settings, banned_words, allowed_domains, flood=None,
+             *, exceptions=(), is_edit=False):
     """Return one Chinese reason or None. Call only after bot/admin exemption checks."""
     content = message.get("text") or message.get("caption") or ""
     clean = normalize(content)
-    for word in banned_words:
-        if word and normalize(word) in clean:
-            return "违禁词"
+    if match_words(clean, banned_words, loose=settings.get("word_loose_match", False),
+                   exceptions=exceptions) is not None:
+        return "违禁词"
     if settings.get("block_forward") and (
         message.get("forward_origin") or message.get("forward_from")
         or message.get("forward_from_chat")):
@@ -140,9 +206,23 @@ def evaluate(message, settings, banned_words, allowed_domains, flood=None):
         allowlist = [d for d in allowlist if d]
         if any(not allowed(domain, allowlist) for domain in extract_domains(message)):
             return "外部链接"
-    if settings.get("anti_flood") and flood is not None:
+    if settings.get("spam_guard_enabled"):
+        if len(_MENTION.findall(clean)) > settings.get("mention_limit", 5):
+            return "批量提及刷屏"
+        if _OBFUSCATED_URL.search(clean) and settings.get("block_links"):
+            return "伪装链接"
+    if settings.get("anti_flood") and flood is not None and not is_edit:
         user = message.get("from", {}).get("id")
         chat = message.get("chat", {}).get("id")
         if user is not None and chat is not None:
-            return flood.check(chat, user, content)
+            return flood.check(
+                chat, user, content,
+                limit=settings.get("flood_limit", 7),
+                window=settings.get("flood_window", 10),
+                repeat_limit=settings.get("repeat_limit", 3),
+                repeat_window=settings.get("repeat_window", 45),
+                media=media_kind(message) if settings.get("media_flood_enabled") else None,
+                media_limit=settings.get("media_flood_limit", 5),
+                media_window=settings.get("media_flood_window", 20),
+                loose=settings.get("word_loose_match", False))
     return None

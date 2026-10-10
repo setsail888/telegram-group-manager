@@ -34,6 +34,8 @@ def run(api, store, config):
         {"command": "stats", "description": "今日群组数据"},
         {"command": "statweek", "description": "最近7天群组统计"},
         {"command": "schedule", "description": "管理员定时公告"},
+        {"command": "guard", "description": "管理员查看反垃圾、防刷屏高级设置"},
+        {"command": "words", "description": "管理员查看本群违禁词"},
         {"command": "checkin", "description": "签到领取积分（需群管理员启用）"},
         {"command": "points", "description": "查看自己在本群的积分"},
         {"command": "pointtop", "description": "查看本群积分排行榜"},
