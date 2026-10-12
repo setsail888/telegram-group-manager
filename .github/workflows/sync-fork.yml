@@ -1,0 +1,21 @@
+name: Auto Sync Fork
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天 UTC 时间 0 点（北京时间早上 8 点）自动运行
+  workflow_dispatch: # 增加此选项以允许在 Actions 页面手动点击运行
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 显式声明写入权限
+    steps:
+      - name: Sync repository with upstream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 使用 GitHub 官方 CLI 进行自动同步
+          gh repo sync ${{ github.repository }} --branch main
+          
+          # 注意：如果原项目的主分支叫 master，请将上一行末尾的 main 改为 master
