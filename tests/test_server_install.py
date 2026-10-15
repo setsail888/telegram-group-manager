@@ -20,6 +20,8 @@ class InstallerScriptTests(unittest.TestCase):
         (self.base / "home").mkdir()
         shutil.copy2(PROJECT / "scripts/server-manager.sh",
                      self.project / "scripts/server-manager.sh")
+        shutil.copy2(PROJECT / "scripts/server-migrate.py",
+                     self.project / "scripts/server-migrate.py")
         shutil.copy2(PROJECT / "scripts/server-bootstrap.sh",
                      self.project / "scripts/server-bootstrap.sh")
         shutil.copy2(PROJECT / "install.sh", self.project / "install.sh")
@@ -400,6 +402,45 @@ install_docker
         source = (PROJECT / "scripts/server-manager.sh").read_text()
         self.assertIn('bash "${APP_DIR}/scripts/server-manager.sh" install', source)
         self.assertNotIn('1) (install) || warn', source)
+
+    def test_migration_prepare_never_configures_a_token_or_starts_the_bot(self):
+        result = self.run_source('''
+install_docker() { printf 'DOCKER_READY\\n'; }
+migration_tools() { printf 'TOOLS_READY\\n'; }
+install_shortcuts() { printf 'SHORTCUTS_READY\\n'; }
+ensure_env() { echo UNEXPECTED_TOKEN_PROMPT; return 99; }
+dc() { echo UNEXPECTED_CONTAINER_START; return 99; }
+prepare
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("DOCKER_READY", result.stdout)
+        self.assertIn("SHORTCUTS_READY", result.stdout)
+        self.assertNotIn("UNEXPECTED", result.stdout)
+        self.assertFalse((self.project/".env").exists())
+
+    def test_local_installer_forwards_prepare_and_compatibility_entry_preserves_arguments(self):
+        (self.project/"scripts/server-manager.sh").write_text('''#!/usr/bin/env bash
+printf 'MODE=%s\\n' "$1"
+''')
+        for entry in ("install.sh", "scripts/server-bootstrap.sh"):
+            result = subprocess.run(["bash", entry, "prepare"], cwd=self.project, env=self.env,
+                                    text=True, capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("MODE=prepare", result.stdout)
+
+    def test_migration_commands_keep_file_paths_with_spaces_as_single_arguments(self):
+        result = self.run_source('''
+migration_tools() { :; }
+python3() { printf '<%s>\\n' "$@"; }
+migrate_action import '/tmp/backup with spaces.ggm'
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("<import>\n</tmp/backup with spaces.ggm>", result.stdout)
+
+    def test_migration_menu_is_discoverable(self):
+        result = self.run_source('tty_line() { REPLY=0; }\nmenu\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("8. 服务器迁移", result.stdout)
 
     def test_compact_menu_has_no_ocr_dashboard_or_manual_backup(self):
         result = self.run_source('tty_line() { REPLY=0; }\nmenu\n')

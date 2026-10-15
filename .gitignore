@@ -17,6 +17,8 @@ data/
 *.bak
 *.zip
 *.tar.gz
+*.ggm
+.groupguard-migration.lock
 .DS_Store
 node_modules/
 docs/.vitepress/cache/

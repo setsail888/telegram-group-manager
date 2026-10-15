@@ -111,6 +111,7 @@ gg
 | 5 | 修改 BotFather Token |
 | 6 | 启动 / 停止 / 重启服务 |
 | 7 | 卸载，默认保留数据 |
+| 8 | 服务器迁移：A导出加密包，B备份并导入 |
 | 0 | 退出 |
 
 OCR、只读网页看板、手动备份从主菜单移除，命令入口保留；更新前仍自动备份。第2项和 `gg update` 均执行 `bash 安装目录/scripts/server-manager.sh update`，不会仅重启旧容器。
@@ -158,6 +159,8 @@ ssh -N -L 8765:127.0.0.1:8765 ubuntu@你的服务器IP
 注意：OCR 识别图片中部分文字，不识别二维码或广告意图；可能跳过大图片或队列拥塞的消息。
 
 ## 八、升级与备份
+
+更换服务器请使用[服务器迁移向导](maintenance/migration.md)：A用`gg migrate export`导出加密包；B通过`prepare`模式准备环境后，再用`gg migrate import`导入。主菜单第8项提供交互入口。
 
 在服务器执行：
 

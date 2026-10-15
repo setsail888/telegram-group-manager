@@ -334,6 +334,43 @@ backup() {
   [[ "${ok}" == "1" ]]
 }
 
+migration_tools() {
+  if ! command -v python3 >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+    check_os
+    info "准备迁移辅助工具：Python 3 标准运行时和 OpenSSL"
+    root apt-get update || die "迁移工具软件源更新失败"
+    root apt-get install -y python3 openssl || die "迁移辅助工具安装失败"
+  fi
+  python3 -c 'import sys; sys.exit(sys.version_info < (3, 8))' ||
+    die "迁移工具需要 Python 3.8 或更高版本"
+  [[ -f "${APP_DIR}/scripts/server-migrate.py" ]] || die "缺少迁移工具，请先更新源码"
+}
+
+prepare() {
+  info "准备B服务器迁移环境：本操作不会启动机器人，也不要求输入Bot Token"
+  install_docker
+  migration_tools
+  install_shortcuts
+  info "环境准备完成。把A的加密迁移包传到本机后，运行：gg migrate import 文件路径"
+}
+
+migrate_action() {
+  migration_tools
+  docker_available || die "请先运行 bash install.sh prepare 准备Docker环境"
+  if [[ "$#" -gt 0 ]]; then
+    python3 "${APP_DIR}/scripts/server-migrate.py" "$@"
+    return
+  fi
+  info "服务器迁移（A导出 → 传输加密迁移包 → B导入）"
+  tty_line "1 从A导出并停止机器人 / 2 导入到B / 0 返回： " || return
+  case "${REPLY}" in
+    1) python3 "${APP_DIR}/scripts/server-migrate.py" export ;;
+    2) python3 "${APP_DIR}/scripts/server-migrate.py" import ;;
+    0) return ;;
+    *) warn "未知选项" ;;
+  esac
+}
+
 install() {
   info "GroupGuard 一键安装 / 修复安装"
   [[ -f "${APP_DIR}/compose.yaml" ]] || die "缺少 Compose 配置"
@@ -470,6 +507,10 @@ GroupGuard 服务器一键管理
   gg / GG                                               中文交互菜单
   gg update                                             先备份再更新 main 并重建容器
   gg shortcuts                                          安装 / 修复 gg 和 GG 快捷命令
+  gg migrate                                            服务器迁移交互菜单
+  gg migrate export [文件路径]                           A导出加密包，成功后保持停止
+  gg migrate import 文件路径                             B校验、备份原数据并导入
+  bash install.sh prepare                                准备B环境，不启动机器人
 
   bash "${APP_DIR}/scripts/server-manager.sh"               中文交互菜单
   bash "${APP_DIR}/scripts/server-manager.sh" install       安装或修复部署
@@ -500,6 +541,7 @@ menu() {
     printf '%s\n' '  5. 修改 BotFather Token'
     printf '%s\n' '  6. 启动 / 停止 / 重启服务'
     printf '%s\n' '  7. 卸载（默认保留积分和群配置）'
+    printf '%s\n' '  8. 服务器迁移（A导出 / B导入）'
     printf '%s\n' '  0. 退出'
     printf '%s\n' '======================================================'
     tty_line '请输入序号： ' || break
@@ -519,6 +561,7 @@ menu() {
       5) (configure_action) || : ;;
       6) (stop_start_menu) || : ;;
       7) (uninstall_menu) || : ;;
+      8) bash "${APP_DIR}/scripts/server-manager.sh" migrate || warn "迁移未完成，请查看上方提示" ;;
       0) return ;;
       *) warn "请输入菜单中的有效序号" ;;
     esac
@@ -528,6 +571,7 @@ menu() {
 
 case "${1:-menu}" in
   install) install ;;
+  prepare) prepare ;;
   update) update ;;
   shortcuts) install_shortcuts ;;
   configure) configure_action ;;
@@ -535,6 +579,7 @@ case "${1:-menu}" in
   logs) show_logs ;;
   logs-follow) dc logs -f --tail=80 groupbot ;;
   backup) backup ;;
+  migrate) shift; migrate_action "$@" ;;
   dashboard) dashboard_menu ;;
   ocr) ocr_menu ;;
   service) stop_start_menu ;;

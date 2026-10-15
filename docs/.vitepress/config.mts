@@ -72,6 +72,7 @@ export default defineConfig({
       { text: '服务器维护', collapsed: true, items: [
         { text: '安装部署详细教程', link: '/server-one-click' },
         { text: 'gg 菜单、升级与备份', link: '/maintenance/server' },
+        { text: '服务器迁移：A → B', link: '/maintenance/migration' },
         { text: '只读网页看板', link: '/maintenance/dashboard' },
         { text: '故障排查', link: '/maintenance/troubleshooting' },
         { text: '管理按钮延迟排查', link: '/slow-buttons' },
