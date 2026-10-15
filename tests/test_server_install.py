@@ -442,6 +442,25 @@ migrate_action import '/tmp/backup with spaces.ggm'
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("8. 服务器迁移", result.stdout)
 
+    def test_public_prepare_clones_without_token_configuration_or_container_start(self):
+        self.env["GROUPGUARD_MOCK_SOURCE"] = str(self.project)
+        self.fake_bin("git", '''#!/usr/bin/env bash
+set -eu
+[[ "$1" == clone ]] || exit 3
+dest="${@: -1}"
+mkdir -p "$dest/.git"
+cp -R "$GROUPGUARD_MOCK_SOURCE"/. "$dest/"
+''')
+        result = subprocess.run(["bash", "-s", "--", "prepare"],
+            input=(self.project/"install.sh").read_text(), cwd=self.base/"home", env=self.env,
+            text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        installed = self.base/"home/groupguard"
+        self.assertTrue((self.base/"bin/gg").exists())
+        self.assertFalse((installed/".env").exists())
+        self.assertNotIn("compose up", self.log.read_text())
+        self.assertIn("环境准备完成", result.stdout)
+
     def test_compact_menu_has_no_ocr_dashboard_or_manual_backup(self):
         result = self.run_source('tty_line() { REPLY=0; }\nmenu\n')
         self.assertEqual(result.returncode, 0, result.stderr)

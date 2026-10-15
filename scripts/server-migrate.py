@@ -408,10 +408,10 @@ def migration_lock(project):
 
 def ask(message):
     try:
-        with open("/dev/tty", "r+") as terminal:
+        with open("/dev/tty", "w") as terminal, open("/dev/tty", "r") as incoming:
             terminal.write(message)
             terminal.flush()
-            answer = terminal.readline()
+            answer = incoming.readline()
             if not answer:
                 raise MigrationError("没有收到输入，操作已取消")
             return answer.rstrip("\r\n")
@@ -421,7 +421,7 @@ def ask(message):
 
 def ask_password(confirm=False):
     try:
-        terminal = open("/dev/tty", "r+")
+        terminal = open("/dev/tty", "w")
     except OSError:
         raise MigrationError("需要交互SSH终端隐藏输入密码，不接受命令参数或管道密码") from None
     with terminal:

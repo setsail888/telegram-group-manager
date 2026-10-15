@@ -9,6 +9,7 @@ import shutil
 import sqlite3
 import tarfile
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -347,6 +348,50 @@ class MigrationTests(unittest.TestCase):
 
 
 class MigrationValidationTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "PTY input is a Linux server facility")
+    def test_real_tty_confirmation_and_hidden_password_prompts(self):
+        import pty
+        import select
+        import signal
+        pid, fd = pty.fork()
+        if pid == 0:
+            try:
+                assert migration.ask("CONFIRM:") == "MIGRATE"
+                assert migration.ask_password(confirm=True) == PASSWORD
+                os.write(1, b"\nTTY_FLOW_OK\n")
+                os._exit(0)
+            except Exception:
+                os._exit(1)
+        output, step, ended = b"", 0, False
+        prompts = [(b"CONFIRM:", b"MIGRATE\n"),
+                   ("迁移包密码（至少12字符，不显示）：".encode(), PASSWORD.encode()+b"\n"),
+                   ("再次输入迁移包密码：".encode(), PASSWORD.encode()+b"\n")]
+        deadline = time.monotonic()+10
+        try:
+            while time.monotonic() < deadline:
+                if not select.select([fd], [], [], 0.1)[0]:
+                    continue
+                try:
+                    chunk = os.read(fd, 4096)
+                except OSError:
+                    ended = True
+                    break
+                if not chunk:
+                    ended = True
+                    break
+                output += chunk
+                if step < len(prompts) and prompts[step][0] in output:
+                    os.write(fd, prompts[step][1])
+                    step += 1
+            if not ended:
+                os.kill(pid, signal.SIGKILL)
+            _, status = os.waitpid(pid, 0)
+            self.assertEqual(status, 0)
+            self.assertIn(b"TTY_FLOW_OK", output)
+            self.assertNotIn(PASSWORD.encode(), output)
+        finally:
+            os.close(fd)
+
     def test_password_prompt_refuses_echoing_fallback_without_tty(self):
         with patch("builtins.open", side_effect=OSError("no tty")):
             with patch.object(migration.getpass, "getpass") as prompt:
