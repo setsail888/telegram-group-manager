@@ -401,7 +401,8 @@ class MigrationValidationTests(unittest.TestCase):
 
     def test_config_rejects_interpolation_external_db_duplicate_keys_and_compose_overrides(self):
         for suffix in (b"COMPOSE_FILE=/tmp/other.yaml\n", b"BOT_TOKEN=duplicate\n", b"CUSTOM=${HOME}\n",
-                       b"DOCKER_HOST=tcp://other:2375\n"):
+                       b"DOCKER_HOST=tcp://other:2375\n", b"PYTHONPATH=/app/data\n",
+                       b"LD_PRELOAD=/app/data/plugin.so\n", b"PATH=/app/data\n"):
             with self.assertRaises(migration.MigrationError):
                 migration.parse_config(config()+suffix)
         with self.assertRaises(migration.MigrationError):

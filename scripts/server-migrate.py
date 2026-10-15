@@ -53,9 +53,10 @@ def parse_config(raw):
             continue
         key, sep, value = line.partition("=")
         if (not sep or not re.fullmatch(r"[A-Z][A-Z0-9_]*", key)
-                or key in values or key.startswith(("COMPOSE_", "DOCKER_"))
+                or key in values or key.startswith(("COMPOSE_", "DOCKER_", "PYTHON", "LD_"))
+                or key in ("PATH", "HOME", "BASH_ENV", "ENV")
                 or any(char in value for char in ("$", "\x00", "\r"))):
-            raise MigrationError("运行配置包含重复字段、动态变量或不支持的Docker配置；不会执行配置内容")
+            raise MigrationError("运行配置包含重复字段、动态变量或不支持的进程配置；不会执行配置内容")
         values[key] = value
     token = values.get("BOT_TOKEN", "")
     if not re.fullmatch(r"[0-9]{6,15}:[A-Za-z0-9_-]{20,}", token):
@@ -351,7 +352,7 @@ class Deployment:
     def volume(self, action):
         self.dc("run", "--rm", "--no-deps", "-T", "--user", "0",
                 "--cap-add", "CHOWN", "--cap-add", "FOWNER", "--cap-add", "DAC_OVERRIDE",
-                "--entrypoint", "python", "groupbot", "-c", VOLUME_TOOL, action)
+                "--entrypoint", "python", "groupbot", "-I", "-S", "-c", VOLUME_TOOL, action)
 
     def replace_data(self, data):
         self.volume("clear")
