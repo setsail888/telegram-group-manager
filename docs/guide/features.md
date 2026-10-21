@@ -74,6 +74,7 @@
 
 - [一键安装、NAS部署](../server-one-click.md)
 - [gg菜单、更新、备份与卸载](../maintenance/server.md)
+- [服务器迁移：A导出、B导入与恢复](../maintenance/migration.md)
 - [只读网页看板](../maintenance/dashboard.md)
 - [故障排查](../maintenance/troubleshooting.md)
 - [全部群内命令](../commands.md)

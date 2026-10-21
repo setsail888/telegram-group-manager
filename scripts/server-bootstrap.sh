@@ -7,7 +7,7 @@ umask 077
 if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
   source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
   if [[ -f "${source_dir}/install.sh" && -f "${source_dir}/compose.yaml" ]]; then
-    exec bash "${source_dir}/install.sh"
+    exec bash "${source_dir}/install.sh" "$@"
   fi
 fi
 
@@ -20,4 +20,4 @@ trap 'rm -f -- "$installer"' EXIT
 curl --proto '=https' --tlsv1.2 --connect-timeout 20 --max-time 120 \
   -fsSL https://raw.githubusercontent.com/slobys/telegram-group-manager/main/install.sh -o "${installer}"
 [[ -s "${installer}" ]] || { printf '下载安装脚本为空，已停止。\n' >&2; exit 1; }
-bash "${installer}"
+bash "${installer}" "$@"

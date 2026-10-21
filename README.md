@@ -35,6 +35,7 @@ gg
 | 5 | 修改 BotFather Token |
 | 6 | 启动 / 停止 / 重启服务 |
 | 7 | 卸载，默认保留数据 |
+| 8 | 服务器迁移：A导出加密包，B校验、备份并导入 |
 | 0 | 退出 |
 
 也可直接更新，无需进入菜单：
@@ -44,6 +45,8 @@ gg update
 ```
 
 更新失败会显示原因；备份失败或源码有本地改动时停止更新。升级保留 `.env`、群配置、积分和订单。旧版还没有 `gg` 时，重新运行上面的安装命令即可；[更多维护命令](docs/server-one-click.md#五日常中文管理菜单) 放在部署指南中。
+
+**更换服务器：** A运行 `gg migrate export` 导出带密码的迁移包，成功后保持机器人停止；B先用安装器的 `prepare` 模式准备环境，再执行 `gg migrate import 文件路径`，沿用原Token、群配置、词库、积分和订单。[服务器迁移完整步骤](docs/maintenance/migration.md)。
 
 ## 在 Telegram 中开始使用
 
@@ -76,6 +79,7 @@ gg update
 | 文档 | 内容 |
 | --- | --- |
 | [服务器部署与维护](docs/server-one-click.md) | 安装、旧版升级、gg/GG、备份恢复准备、OCR、看板和排障 |
+| [服务器迁移](docs/maintenance/migration.md) | A导出加密包、B准备与导入、数据核对及失败恢复 |
 | [中文按钮操作](docs/button-management.md) | 管理员与成员各项功能入口、表单、预览确认 |
 | [词库与中文变体](docs/word-library.md) | 启用分类、短词/同音识别、例外、导入格式及来源 |
 | [跨账号防刷屏与惩罚](docs/cross-account-flood.md) | 检测阈值、清理范围、五种惩罚和时长 |
